@@ -254,8 +254,9 @@ def preprocess_data(df):
     targets = []
 
     for key, group in filtered_groups.items():
-        # Ensure the group is sorted
+        # sort the groups by searchDate
         group = group.sort_values("searchDate").reset_index(drop=True)
+        # get the last 30 days of data
         window = group.iloc[-sequence_length:]
 
         # Compute ordinals if they don't exist
