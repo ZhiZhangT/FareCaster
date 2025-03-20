@@ -12,13 +12,6 @@ if not os.path.exists(constants.SAVED_DIR):
     os.makedirs(constants.SAVED_DIR)
 
 
-# Define your random state and any constant paths.
-RANDOM_STATE = 42
-RAW_DATA_PATH = "data/itineraries_10perc.csv"
-PROCESSED_DATA_FILE = f"{constants.SAVED_DIR}preprocessed_data.pkl"
-SCALER_FILE = f"{constants.SAVED_DIR}scaler.pkl"
-
-
 def parse_date(date_str):
     """
     Parse a date string using several common formats.
@@ -220,7 +213,7 @@ def parse_date(date_str):
 
 
 # Wrap your raw data loading in a function.
-def load_raw_data(filepath=RAW_DATA_PATH):
+def load_raw_data(filepath=constants.RAW_DATA_PATH):
     return pd.read_csv(filepath)
 
 
@@ -283,10 +276,10 @@ def preprocess_data(df):
 
     # Split into train, validation, and test sets.
     X_train, X_temp, y_train, y_temp = train_test_split(
-        X_all, y_all, test_size=0.2, random_state=RANDOM_STATE
+        X_all, y_all, test_size=0.2, random_state=constants.RANDOM_STATE
     )
     X_val, X_test, y_val, y_test = train_test_split(
-        X_temp, y_temp, test_size=0.5, random_state=RANDOM_STATE
+        X_temp, y_temp, test_size=0.5, random_state=constants.RANDOM_STATE
     )
 
     # Scale the features.
@@ -311,20 +304,20 @@ def preprocess_data(df):
         "y_test": y_test,
     }
 
-    with open(SCALER_FILE, "wb") as f:
+    with open(constants.SCALER_FILE, "wb") as f:
         pickle.dump(scaler, f)
 
     return data
 
 
 # Save processed data and fitted scaler to disk.
-def save_processed_data(data, data_filepath=PROCESSED_DATA_FILE):
+def save_processed_data(data, data_filepath=constants.PROCESSED_DATA_FILE):
     with open(data_filepath, "wb") as f:
         pickle.dump(data, f)
 
 
 # Load processed data and scaler from disk.
-def load_processed_data(data_filepath=PROCESSED_DATA_FILE):
+def load_processed_data(data_filepath=constants.PROCESSED_DATA_FILE):
     with open(data_filepath, "rb") as f:
         data = pickle.load(f)
 
@@ -335,8 +328,8 @@ def load_processed_data(data_filepath=PROCESSED_DATA_FILE):
 def get_data(force_reprocess=False):
     if (
         not force_reprocess
-        and os.path.exists(PROCESSED_DATA_FILE)
-        and os.path.exists(SCALER_FILE)
+        and os.path.exists(constants.PROCESSED_DATA_FILE)
+        and os.path.exists(constants.SCALER_FILE)
     ):
         print("Loading preprocessed data and scaler from disk...")
         return load_processed_data()
