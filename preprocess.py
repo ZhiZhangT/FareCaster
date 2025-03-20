@@ -1,7 +1,22 @@
 # preprocessing.py
 import pandas as pd
 import numpy as np
-from sklearn.preprocessing import LabelEncoder
+import pickle
+import os
+import constants
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.model_selection import train_test_split
+
+# if saved directory does not exist, create it
+if not os.path.exists(constants.SAVED_DIR):
+    os.makedirs(constants.SAVED_DIR)
+
+
+# Define your random state and any constant paths.
+RANDOM_STATE = 42
+RAW_DATA_PATH = "data/itineraries_10perc.csv"
+PROCESSED_DATA_FILE = f"{constants.SAVED_DIR}preprocessed_data.pkl"
+SCALER_FILE = f"{constants.SAVED_DIR}scaler.pkl"
 
 
 def parse_date(date_str):
@@ -16,36 +31,68 @@ def parse_date(date_str):
     raise ValueError(f"No valid date format found for: {date_str}")
 
 
-def preprocess_dataframe(df, fit=True, le_start=None, le_dest=None):
+def preprocess_grouped_dataframe(groups, fit=True, le_start=None, le_dest=None):
     """
-    Preprocess the DataFrame by parsing dates and encoding categorical features.
-    Scaling is postponed so that we can keep the DataFrame for splitting and sorting.
+    Preprocess a dictionary of DataFrame groups (output of group_routes_by_flight_date).
+    For each group, parse dates, create ordinal columns, and encode categorical features.
+
+    Parameters:
+      groups: dict
+          Dictionary where keys are group identifiers and values are DataFrames.
+      fit: bool
+          Whether to fit new LabelEncoders or use the provided ones.
+      le_start: LabelEncoder or None
+          Pre-fitted label encoder for 'startingAirport' (if fit is False).
+      le_dest: LabelEncoder or None
+          Pre-fitted label encoder for 'destinationAirport' (if fit is False).
+
+    Returns:
+      processed_groups: dict
+          Dictionary of processed DataFrames with additional columns.
+      (le_start, le_dest): tuple
+          The fitted label encoders.
     """
-    df = df.copy()
+    # First, process each group individually (parse dates and create ordinal columns)
+    processed_groups = {}
+    for key, df in groups.items():
+        df = df.copy()
+        # Ensure that the date columns are datetime objects
+        if not pd.api.types.is_datetime64_any_dtype(df["searchDate"]):
+            df["searchDate"] = df["searchDate"].apply(parse_date)
+        if not pd.api.types.is_datetime64_any_dtype(df["flightDate"]):
+            df["flightDate"] = df["flightDate"].apply(parse_date)
+        # Create ordinal columns
+        df["searchDate_ordinal"] = df["searchDate"].apply(lambda x: x.toordinal())
+        df["flightDate_ordinal"] = df["flightDate"].apply(lambda x: x.toordinal())
+        processed_groups[key] = df
 
-    # Parse dates and convert to datetime objects (assuming parse_date is defined)
-    df["searchDate"] = df["searchDate"].apply(parse_date)
-    df["flightDate"] = df["flightDate"].apply(parse_date)
+    # Combine all groups to fit the LabelEncoders on the complete data
+    combined_df = pd.concat(processed_groups.values(), ignore_index=True)
 
-    # Create ordinal columns (useful for modeling)
-    df["searchDate_ordinal"] = df["searchDate"].apply(lambda x: x.toordinal())
-    df["flightDate_ordinal"] = df["flightDate"].apply(lambda x: x.toordinal())
-
-    # Encode categorical features
+    # Encode categorical features: startingAirport and destinationAirport
     if fit:
         le_start = LabelEncoder()
         le_dest = LabelEncoder()
-        df["startingAirport_enc"] = le_start.fit_transform(df["startingAirport"])
-        df["destinationAirport_enc"] = le_dest.fit_transform(df["destinationAirport"])
+        le_start.fit(combined_df["startingAirport"])
+        le_dest.fit(combined_df["destinationAirport"])
+        with open(f"{constants.SAVED_DIR}le_start.pkl", "wb") as f:
+            pickle.dump(le_start, f)
+
+        with open(f"{constants.SAVED_DIR}le_dest.pkl", "wb") as f:
+            pickle.dump(le_dest, f)
     else:
         if le_start is None or le_dest is None:
             raise ValueError(
                 "Pre-fitted label encoders must be provided when fit=False."
             )
+
+    # Apply encoding to each group using the fitted encoders
+    for key, df in processed_groups.items():
         df["startingAirport_enc"] = le_start.transform(df["startingAirport"])
         df["destinationAirport_enc"] = le_dest.transform(df["destinationAirport"])
+        processed_groups[key] = df
 
-    return df, (le_start, le_dest)
+    return processed_groups
 
 
 def preprocess_sample(raw_sample, le_start, le_dest, scaler):
@@ -161,3 +208,149 @@ def group_routes_by_flight_date(dataframe):
     }
 
     return route_date_groups
+
+
+def parse_date(date_str):
+    for fmt in ("%d/%m/%y", "%Y-%m-%d"):
+        try:
+            return pd.to_datetime(date_str, format=fmt)
+        except ValueError:
+            continue
+    raise ValueError(f"No valid date format found for: {date_str}")
+
+
+# Wrap your raw data loading in a function.
+def load_raw_data(filepath=RAW_DATA_PATH):
+    return pd.read_csv(filepath)
+
+
+# Encapsulate all preprocessing steps into one function.
+def preprocess_data(df):
+    # Convert epoch seconds to datetime
+    df["segmentsDepartureTime"] = pd.to_datetime(
+        df["segmentsDepartureTimeEpochSeconds"], unit="s"
+    )
+    df["segmentsArrivalTime"] = pd.to_datetime(
+        df["segmentsArrivalTimeEpochSeconds"], unit="s"
+    )
+
+    # Convert duration to timedelta
+    df["segmentsDuration"] = pd.to_timedelta(df["segmentsDurationInSeconds"], unit="s")
+
+    # Group routes by flight date
+    route_date_groups = group_routes_by_flight_date(df)
+    processed_groups = preprocess_grouped_dataframe(route_date_groups, fit=True)
+
+    # Filter groups with at least 30 search dates
+    filtered_groups = {
+        key: group for key, group in processed_groups.items() if len(group) >= 30
+    }
+
+    # Define columns and parameters
+    feature_cols = [
+        "searchDate_ordinal",
+        "flightDate_ordinal",
+        "startingAirport_enc",
+        "destinationAirport_enc",
+        "seatsRemaining",
+    ]
+    target_col = "totalFare"
+    sequence_length = 30
+
+    sequences = []
+    targets = []
+
+    for key, group in filtered_groups.items():
+        # Ensure the group is sorted
+        group = group.sort_values("searchDate").reset_index(drop=True)
+        window = group.iloc[-sequence_length:]
+
+        # Compute ordinals if they don't exist
+        if "searchDate_ordinal" not in window.columns:
+            window["searchDate_ordinal"] = window["searchDate"].apply(
+                lambda x: x.toordinal()
+            )
+        if "flightDate_ordinal" not in window.columns:
+            window["flightDate_ordinal"] = window["flightDate"].apply(
+                lambda x: x.toordinal()
+            )
+
+        sequences.append(window[feature_cols].values)
+        targets.append(window[target_col].values[-1])
+
+    X_all = np.array(sequences)
+    y_all = np.array(targets)
+
+    # Split into train, validation, and test sets.
+    X_train, X_temp, y_train, y_temp = train_test_split(
+        X_all, y_all, test_size=0.2, random_state=RANDOM_STATE
+    )
+    X_val, X_test, y_val, y_test = train_test_split(
+        X_temp, y_temp, test_size=0.5, random_state=RANDOM_STATE
+    )
+
+    # Scale the features.
+    num_features = X_train.shape[2]
+    scaler = StandardScaler()
+    X_train_scaled = scaler.fit_transform(X_train.reshape(-1, num_features)).reshape(
+        X_train.shape
+    )
+    X_val_scaled = scaler.transform(X_val.reshape(-1, num_features)).reshape(
+        X_val.shape
+    )
+    X_test_scaled = scaler.transform(X_test.reshape(-1, num_features)).reshape(
+        X_test.shape
+    )
+
+    data = {
+        "X_train": X_train_scaled,
+        "y_train": y_train,
+        "X_val": X_val_scaled,
+        "y_val": y_val,
+        "X_test": X_test_scaled,
+        "y_test": y_test,
+    }
+
+    with open(SCALER_FILE, "wb") as f:
+        pickle.dump(scaler, f)
+
+    return data
+
+
+# Save processed data and fitted scaler to disk.
+def save_processed_data(data, data_filepath=PROCESSED_DATA_FILE):
+    with open(data_filepath, "wb") as f:
+        pickle.dump(data, f)
+
+
+# Load processed data and scaler from disk.
+def load_processed_data(data_filepath=PROCESSED_DATA_FILE):
+    with open(data_filepath, "rb") as f:
+        data = pickle.load(f)
+
+    return data
+
+
+# Main function to get data. It will load from cache if available unless forced to reprocess.
+def get_data(force_reprocess=False):
+    if (
+        not force_reprocess
+        and os.path.exists(PROCESSED_DATA_FILE)
+        and os.path.exists(SCALER_FILE)
+    ):
+        print("Loading preprocessed data and scaler from disk...")
+        return load_processed_data()
+    else:
+        print("Processing raw data...")
+        df = load_raw_data()
+        data = preprocess_data(df)
+        save_processed_data(data)
+        return data
+
+
+if __name__ == "__main__":
+    # This will run the full pipeline only if cached files are missing.
+    data = get_data()
+    print("Train data shape:", data["X_train"].shape)
+    print("Validation data shape:", data["X_val"].shape)
+    print("Test data shape:", data["X_test"].shape)

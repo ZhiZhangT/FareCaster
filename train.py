@@ -1,115 +1,36 @@
-import pandas as pd
 import torch
 import torch.nn as nn
-import constants
 import time
 from models import GRUModel, LSTMModel
 from torch.utils.data import TensorDataset, DataLoader
-from sklearn.model_selection import train_test_split
-from preprocess import preprocess_dataframe
-from sklearn.preprocessing import StandardScaler
+from preprocess import get_data
 
 
 # -------------------------------
 # Load and preprocess the dataset
 # -------------------------------
 
-# Load CSV file (adjust the path if necessary)
-df = pd.read_csv("data/itineraries_filtered.csv")
-
-# -------------------------------
-# Split the original dataset (raw, unprocessed) into train (80%), validation (10%), and test (10%)
-# -------------------------------
-train_df, temp_df = train_test_split(
-    df, test_size=0.2, random_state=constants.RANDOM_STATE
-)
-val_df, test_df = train_test_split(
-    temp_df, test_size=0.5, random_state=constants.RANDOM_STATE
-)
+# data = {
+#     "X_train": X_train_scaled,
+#     "y_train": y_train,
+#     "X_val": X_val_scaled,
+#     "y_val": y_val,
+#     "X_test": X_test_scaled,
+#     "y_test": y_test,
+# }
 
 
-# Save raw validation and test datasets to CSV (all columns preserved)
-val_df.to_csv(constants.VALIDATION_FILEPATH, index=False)
-test_df.to_csv(constants.TEST_FILEPATH, index=False)
+data = get_data()
+
+X_train_scaled = data["X_train"]
+y_train = data["y_train"]
+X_val_scaled = data["X_val"]
+y_val = data["y_val"]
+X_test_scaled = data["X_test"]
+y_test = data["y_test"]
 
 
-def parse_date(date_str):
-    # List of possible date formats
-    for fmt in ("%d/%m/%y", "%Y-%m-%d"):
-        try:
-            return pd.to_datetime(date_str, format=fmt)
-        except ValueError:
-            continue
-    # If none of the formats match, raise an error
-    raise ValueError(f"No valid date format found for: {date_str}")
-
-
-# # Save the fitted scaler and label encoders
-# with open("scaler.pkl", "wb") as f:
-#     pickle.dump(scaler, f)
-
-# with open("le_start.pkl", "wb") as f:
-#     pickle.dump(le_start, f)
-
-# with open("le_dest.pkl", "wb") as f:
-#     pickle.dump(le_dest, f)
-
-
-# Preprocess the full DataFrame
-processed_df, (le_start, le_dest) = preprocess_dataframe(df, fit=True)
-
-# Specify your target column
-target_col = "totalFare"
-
-# First split: 80% train and 20% temporary
-df_train, df_temp = train_test_split(
-    processed_df, test_size=0.2, random_state=constants.RANDOM_STATE
-)
-# Then split the temporary set equally into validation and test (10% each)
-df_val, df_test = train_test_split(
-    df_temp, test_size=0.5, random_state=constants.RANDOM_STATE
-)
-
-# Sorting on the original date columns (which are still in datetime format)
-df_train = df_train.sort_values(by=["searchDate", "flightDate"])
-df_val = df_val.sort_values(by=["searchDate", "flightDate"])
-df_test = df_test.sort_values(by=["searchDate", "flightDate"])
-
-# Define the feature columns to use (use the processed/ordinal/encoded columns)
-feature_cols = [
-    "searchDate_ordinal",
-    "flightDate_ordinal",
-    "startingAirport_enc",
-    "destinationAirport_enc",
-    "seatsRemaining",
-]
-
-# Extract features and target values from each split
-X_train_df = df_train[feature_cols]
-y_train = df_train[target_col].values
-
-X_val_df = df_val[feature_cols]
-y_val = df_val[target_col].values
-
-X_test_df = df_test[feature_cols]
-y_test = df_test[target_col].values
-
-# Fit the scaler on training features and transform validation and test features
-scaler = StandardScaler()
-X_train_scaled = scaler.fit_transform(X_train_df)
-X_val_scaled = scaler.transform(X_val_df)
-X_test_scaled = scaler.transform(X_test_df)
-
-# Reshape to (samples, timesteps, features)
-X_train_scaled = X_train_scaled.reshape(
-    (X_train_scaled.shape[0], 1, X_train_scaled.shape[1])
-)
-X_val_scaled = X_val_scaled.reshape((X_val_scaled.shape[0], 1, X_val_scaled.shape[1]))
-X_test_scaled = X_test_scaled.reshape(
-    (X_test_scaled.shape[0], 1, X_test_scaled.shape[1])
-)
-
-# Convert arrays to PyTorch tensors
+# ----- Convert to PyTorch Tensors -----
 X_train_tensor = torch.tensor(X_train_scaled, dtype=torch.float32)
 y_train_tensor = torch.tensor(y_train, dtype=torch.float32).unsqueeze(1)
 
@@ -125,9 +46,9 @@ train_dataset = TensorDataset(X_train_tensor, y_train_tensor)
 val_dataset = TensorDataset(X_val_tensor, y_val_tensor)
 test_dataset = TensorDataset(X_test_tensor, y_test_tensor)
 
-train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
-val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
-test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+val_loader = DataLoader(val_dataset, batch_size=batch_size)
+test_loader = DataLoader(test_dataset, batch_size=batch_size)
 
 # -------------------------------
 # Training and Evaluation Functions
@@ -138,7 +59,13 @@ def train_model(
     model, train_loader, val_loader, num_epochs=10, lr=0.001, model_save_path=None
 ):
     start_time = time.time()
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+    elif torch.mps.is_available():
+        device = torch.device("mps")
+    else:
+        device = torch.device("cpu")
+    print(f"Training on device: {device}")
     model.to(device)
 
     criterion = nn.MSELoss()
@@ -148,6 +75,7 @@ def train_model(
     best_epoch = -1
 
     for epoch in range(num_epochs):
+        start_time_epoch = time.time()
         model.train()
         train_loss = 0.0
         for X_batch, y_batch in train_loader:
@@ -189,6 +117,8 @@ def train_model(
                     f"Saved best model at epoch {epoch+1} with val loss {best_val_loss:.4f}"
                 )
 
+        print(f"Time taken for epoch {epoch+1}: {time.time() - start_time_epoch:.2f}s")
+
     # Optionally, load the best model state at the end of training
     if best_epoch != -1 and model_save_path is not None:
         model.load_state_dict(torch.load(model_save_path))
@@ -196,13 +126,20 @@ def train_model(
             f"Loaded best model from epoch {best_epoch+1} with val loss {best_val_loss:.4f}"
         )
 
-    print(f"Time taken for epoch {num_epochs}: {time.time() - start_time:.2f}s")
+    print(f"Total time taken: {time.time() - start_time:.2f}s")
 
     return model
 
 
 def evaluate_model(model, test_loader):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+    elif torch.mps.is_available():
+        device = torch.device("mps")
+    else:
+        device = torch.device("cpu")
+    print(f"Evaluating on device: {device}")
+    model.to(device)
     model.eval()
     criterion = nn.MSELoss()
     test_loss = 0.0
@@ -225,7 +162,7 @@ def evaluate_model(model, test_loader):
 # -------------------------------
 
 input_size = X_train_scaled.shape[2]  # number of features
-print(f"input_size: {input_size}")
+print(f"input_size (number of features): {input_size}")
 
 # Train GRU Model
 print("Training GRU model...")
@@ -238,7 +175,7 @@ gru_model = train_model(
     train_loader,
     val_loader,
     num_epochs=50,
-    lr=0.001,
+    lr=0.005,
     model_save_path=gru_save_path,
 )
 gru_test_loss, gru_test_mae = evaluate_model(gru_model, test_loader)
@@ -255,7 +192,7 @@ lstm_model = train_model(
     train_loader,
     val_loader,
     num_epochs=50,
-    lr=0.001,
+    lr=0.005,
     model_save_path=lstm_save_path,
 )
 lstm_test_loss, lstm_test_mae = evaluate_model(lstm_model, test_loader)
