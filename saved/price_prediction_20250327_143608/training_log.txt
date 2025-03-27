@@ -1,3 +1,6 @@
+NOTE:
+1. Trained on SHALLOW neural network models (GRU and LSTM) with 1 layer and 32 hidden neurons
+2. Did NOT use sliding window dataset
 Starting training run in directory: saved/price_prediction_20250327_143608
 Loading preprocessed data and scaler from disk...
 input_size (number of features): 14
