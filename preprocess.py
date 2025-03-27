@@ -227,8 +227,54 @@ def cyclical_encode(X, feature_cols, cyclical_features):
     return X_updated
 
 
+def get_last_window(group, seq_len, feature_cols, target_col):
+    group = group.sort_values("searchDate").reset_index(drop=True)
+    if len(group) < seq_len:
+        return None, None
+    window = group.iloc[-seq_len:]
+    return window[feature_cols].values, window[target_col].values[-1]
+
+
+def get_sliding_windows(group, seq_len, feature_cols, target_col):
+    group = group.sort_values("searchDate").reset_index(drop=True)
+    windows, targets = [], []
+    if len(group) <= seq_len:
+        return windows, targets
+    # Create a sliding window for each possible position.
+    for i in range(seq_len, len(group)):
+        # first group starts from index 0 to seq_len
+        window = group.iloc[i - seq_len : i]
+        windows.append(window[feature_cols].values)
+        targets.append(group.iloc[i][target_col])
+    return windows, targets
+
+
+def create_datasets(keys, filtered_groups, sequence_length, feature_cols, target_col):
+    X_last, y_last = [], []
+    X_slide, y_slide = [], []
+    for key in keys:
+        group = filtered_groups[key]
+        last_seq, last_target = get_last_window(
+            group, sequence_length, feature_cols, target_col
+        )
+        if last_seq is not None:
+            X_last.append(last_seq)
+            y_last.append(last_target)
+        windows, targets = get_sliding_windows(
+            group, sequence_length, feature_cols, target_col
+        )
+        X_slide.extend(windows)
+        y_slide.extend(targets)
+    return np.array(X_last), np.array(y_last), np.array(X_slide), np.array(y_slide)
+
+
 # Encapsulate all preprocessing steps into one function.
-def preprocess_data(df, feature_cols=constants.FEATURE_COLS):
+def preprocess_data(
+    df,
+    feature_cols=constants.FEATURE_COLS,
+    categorical_cols=constants.CATEGORICAL_COLS,
+    cyclical_features=constants.CYCLICAL_FEATURES,
+):
     # NOTE: these fields have to be added before group_routes_by_flight_date as they are used in the function
     # Convert epoch seconds to datetime
     df["segmentsDepartureTime"] = pd.to_datetime(
@@ -257,81 +303,75 @@ def preprocess_data(df, feature_cols=constants.FEATURE_COLS):
     target_col = "totalFare"
     sequence_length = 30
 
-    sequences = []
-    targets = []
+    # --- Split into train/test/validation first ---
 
-    for key, group in filtered_groups.items():
-        # sort the groups by searchDate
-        group = group.sort_values("searchDate").reset_index(drop=True)
-        # get the last 30 days of data
-        window = group.iloc[-sequence_length:]
-
-        sequences.append(window[feature_cols].values)
-        targets.append(window[target_col].values[-1])
-
-    X_all = np.array(sequences)
-    y_all = np.array(targets)
-
-    # Split into train, validation, and test sets.
-    X_train, X_temp, y_train, y_temp = train_test_split(
-        X_all, y_all, test_size=0.2, random_state=constants.RANDOM_STATE
+    group_keys = list(filtered_groups.keys())
+    train_keys, temp_keys = train_test_split(
+        group_keys, test_size=0.2, random_state=constants.RANDOM_STATE
     )
-    X_val, X_test, y_val, y_test = train_test_split(
-        X_temp, y_temp, test_size=0.5, random_state=constants.RANDOM_STATE
+    val_keys, test_keys = train_test_split(
+        temp_keys, test_size=0.5, random_state=constants.RANDOM_STATE
     )
 
-    categorical_cols = [
-        "searchDayOfWeek",
-        "flightDayOfWeek",
-        "startingAirport_enc",
-        "destinationAirport_enc",
-        "searchMonth",
-        "flightMonth",
-        "departureHourUTC",
-    ]
-    cyclical_features = {
-        "searchDayOfWeek": 7,
-        "flightDayOfWeek": 7,
-        "searchMonth": 12,
-        "flightMonth": 12,
-        "departureHourUTC": 24,
-    }
+    # Create datasets for each split.
+    X_train, y_train, X_train_sliding, y_train_sliding = create_datasets(
+        train_keys, filtered_groups, sequence_length, feature_cols, target_col
+    )
+    X_val, y_val, X_val_sliding, y_val_sliding = create_datasets(
+        val_keys, filtered_groups, sequence_length, feature_cols, target_col
+    )
+    X_test, y_test, X_test_sliding, y_test_sliding = create_datasets(
+        test_keys, filtered_groups, sequence_length, feature_cols, target_col
+    )
 
-    # Determine numeric columns (i.e. features not in categorical_cols).
+    # --- Helper Function for Scaling ---
+
+    # Identify numeric columns (i.e. features not in categorical_cols).
     numeric_cols = [col for col in feature_cols if col not in categorical_cols]
     numeric_indices = [feature_cols.index(col) for col in numeric_cols]
 
-    # Scale only numeric features using StandardScaler.
     scaler = StandardScaler()
 
-    # For training data: flatten numeric features, fit the scaler, then reshape and replace.
-    X_train_numeric = X_train[..., numeric_indices].reshape(-1, len(numeric_indices))
-    X_train_numeric_scaled = scaler.fit_transform(X_train_numeric).reshape(
-        X_train.shape[0], X_train.shape[1], len(numeric_indices)
-    )
-    X_train_scaled = X_train.copy()
-    X_train_scaled[..., numeric_indices] = X_train_numeric_scaled
+    def scale_data(X, scaler, numeric_indices, fit=False):
+        # Flatten the numeric features
+        X_numeric = X[..., numeric_indices].reshape(-1, len(numeric_indices))
+        if fit:
+            X_numeric_scaled = scaler.fit_transform(X_numeric)
+        else:
+            X_numeric_scaled = scaler.transform(X_numeric)
+        # Reshape back to the original 3D shape and replace numeric features.
+        X_numeric_scaled = X_numeric_scaled.reshape(
+            X.shape[0], X.shape[1], len(numeric_indices)
+        )
+        X_scaled = X.copy()
+        X_scaled[..., numeric_indices] = X_numeric_scaled
+        return X_scaled
 
-    # For validation data: transform the numeric features using the fitted scaler.
-    X_val_numeric = X_val[..., numeric_indices].reshape(-1, len(numeric_indices))
-    X_val_numeric_scaled = scaler.transform(X_val_numeric).reshape(
-        X_val.shape[0], X_val.shape[1], len(numeric_indices)
-    )
-    X_val_scaled = X_val.copy()
-    X_val_scaled[..., numeric_indices] = X_val_numeric_scaled
+    # --- Scaling and Cyclical Encoding ---
 
-    # For test data: transform the numeric features using the fitted scaler.
-    X_test_numeric = X_test[..., numeric_indices].reshape(-1, len(numeric_indices))
-    X_test_numeric_scaled = scaler.transform(X_test_numeric).reshape(
-        X_test.shape[0], X_test.shape[1], len(numeric_indices)
-    )
-    X_test_scaled = X_test.copy()
-    X_test_scaled[..., numeric_indices] = X_test_numeric_scaled
+    X_train_scaled = scale_data(X_train, scaler, numeric_indices, fit=True)
+    X_val_scaled = scale_data(X_val, scaler, numeric_indices)
+    X_test_scaled = scale_data(X_test, scaler, numeric_indices)
 
-    # Apply cyclical encoding to the scaled datasets.
     X_train_final = cyclical_encode(X_train_scaled, feature_cols, cyclical_features)
     X_val_final = cyclical_encode(X_val_scaled, feature_cols, cyclical_features)
     X_test_final = cyclical_encode(X_test_scaled, feature_cols, cyclical_features)
+
+    X_train_sliding_scaled = scale_data(X_train_sliding, scaler, numeric_indices)
+    X_val_sliding_scaled = scale_data(X_val_sliding, scaler, numeric_indices)
+    X_test_sliding_scaled = scale_data(X_test_sliding, scaler, numeric_indices)
+
+    X_train_sliding_final = cyclical_encode(
+        X_train_sliding_scaled, feature_cols, cyclical_features
+    )
+    X_val_sliding_final = cyclical_encode(
+        X_val_sliding_scaled, feature_cols, cyclical_features
+    )
+    X_test_sliding_final = cyclical_encode(
+        X_test_sliding_scaled, feature_cols, cyclical_features
+    )
+
+    # --- Package the Data ---
 
     data = {
         "X_train_scaled": X_train_final,
@@ -343,6 +383,12 @@ def preprocess_data(df, feature_cols=constants.FEATURE_COLS):
         "X_train": X_train,
         "X_val": X_val,
         "X_test": X_test,
+        "X_train_sliding_window_scaled": X_train_sliding_final,
+        "y_train_sliding_window": y_train_sliding,
+        "X_val_sliding_window_scaled": X_val_sliding_final,
+        "y_val_sliding_window": y_val_sliding,
+        "X_test_sliding_window_scaled": X_test_sliding_final,
+        "y_test_sliding_window": y_test_sliding,
     }
 
     with open(constants.SCALER_FILE, "wb") as f:
@@ -388,3 +434,10 @@ if __name__ == "__main__":
     print("Train data shape:", data["X_train_scaled"].shape)
     print("Validation data shape:", data["X_val_scaled"].shape)
     print("Test data shape:", data["X_test_scaled"].shape)
+    print(
+        f"Train data for sliding window: {data['X_train_sliding_window_scaled'].shape}"
+    )
+    print(
+        f"Validation data for sliding window: {data['X_val_sliding_window_scaled'].shape}"
+    )
+    print(f"Test data for sliding window: {data['X_test_sliding_window_scaled'].shape}")

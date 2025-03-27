@@ -16,3 +16,19 @@ FEATURE_COLS = [
     "flightMonth",
     "departureHourUTC",
 ]
+CATEGORICAL_COLS = [
+    "searchDayOfWeek",
+    "flightDayOfWeek",
+    "startingAirport_enc",
+    "destinationAirport_enc",
+    "searchMonth",
+    "flightMonth",
+    "departureHourUTC",
+]
+CYCLICAL_FEATURES = {
+    "searchDayOfWeek": 7,
+    "flightDayOfWeek": 7,
+    "searchMonth": 12,
+    "flightMonth": 12,
+    "departureHourUTC": 24,
+}
