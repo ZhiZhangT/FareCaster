@@ -4,6 +4,7 @@ import numpy as np
 import pickle
 import os
 import constants
+import time
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.model_selection import train_test_split
 
@@ -54,9 +55,29 @@ def preprocess_grouped_dataframe(groups, fit=True, le_start=None, le_dest=None):
             df["searchDate"] = df["searchDate"].apply(parse_date)
         if not pd.api.types.is_datetime64_any_dtype(df["flightDate"]):
             df["flightDate"] = df["flightDate"].apply(parse_date)
+        # check if the column "segmentsDepartureTime" exists
+        if "segmentsDepartureTime" not in df.columns:
+            df["segmentsDepartureTime"] = pd.to_datetime(
+                df["segmentsDepartureTimeEpochSeconds"], unit="s"
+            )
+
         # Create ordinal columns
         df["searchDate_ordinal"] = df["searchDate"].apply(lambda x: x.toordinal())
         df["flightDate_ordinal"] = df["flightDate"].apply(lambda x: x.toordinal())
+
+        # day of week (0 = Monday, 6 = Sunday)
+        df["searchDayOfWeek"] = df["searchDate"].dt.weekday
+        df["flightDayOfWeek"] = df["flightDate"].dt.weekday
+
+        # days between search and flight dates
+        df["daysBetweenSearchAndFlight"] = (df["flightDate"] - df["searchDate"]).dt.days
+
+        # month of search and flight dates
+        df["searchMonth"] = df["searchDate"].dt.month
+        df["flightMonth"] = df["flightDate"].dt.month
+
+        # hour that flight departed in UTC
+        df["departureHourUTC"] = df["segmentsDepartureTime"].dt.hour
         processed_groups[key] = df
 
     # Combine all groups to fit the LabelEncoders on the complete data
@@ -217,8 +238,38 @@ def load_raw_data(filepath=constants.RAW_DATA_PATH):
     return pd.read_csv(filepath)
 
 
+# Function to perform cyclical encoding on the cyclical features.
+def cyclical_encode(X, feature_cols, cyclical_features):
+    """
+    For each cyclical feature, compute sine and cosine values and append them.
+    Then remove the original cyclical columns from X.
+    """
+    indices_to_remove = []
+    new_features = []
+    for feature, period in cyclical_features.items():
+        idx = feature_cols.index(feature)
+        indices_to_remove.append(idx)
+        # Extract the feature values (shape: [samples, sequence_length])
+        values = X[..., idx]
+        # Compute sine and cosine transformations.
+        sin_feat = np.sin(2 * np.pi * values / period)
+        cos_feat = np.cos(2 * np.pi * values / period)
+        # Expand dims so they can be concatenated along the last axis.
+        sin_feat = np.expand_dims(sin_feat, axis=-1)
+        cos_feat = np.expand_dims(cos_feat, axis=-1)
+        new_features.append(sin_feat)
+        new_features.append(cos_feat)
+
+    # Remove the original cyclical columns.
+    X_updated = np.delete(X, indices_to_remove, axis=-1)
+    # Append the new sine and cosine features.
+    X_updated = np.concatenate([X_updated] + new_features, axis=-1)
+    return X_updated
+
+
 # Encapsulate all preprocessing steps into one function.
-def preprocess_data(df):
+def preprocess_data(df, feature_cols=constants.FEATURE_COLS):
+    # NOTE: these fields have to be added before group_routes_by_flight_date as they are used in the function
     # Convert epoch seconds to datetime
     df["segmentsDepartureTime"] = pd.to_datetime(
         df["segmentsDepartureTimeEpochSeconds"], unit="s"
@@ -232,21 +283,17 @@ def preprocess_data(df):
 
     # Group routes by flight date
     route_date_groups = group_routes_by_flight_date(df)
+    start_time = time.time()
     processed_groups = preprocess_grouped_dataframe(route_date_groups, fit=True)
+    print(
+        f"Time taken to run preprocess_grouped_dataframe(): {time.time() - start_time:.2f} seconds"
+    )
 
     # Filter groups with at least 30 search dates
     filtered_groups = {
         key: group for key, group in processed_groups.items() if len(group) >= 30
     }
 
-    # Define columns and parameters
-    feature_cols = [
-        "searchDate_ordinal",
-        "flightDate_ordinal",
-        "startingAirport_enc",
-        "destinationAirport_enc",
-        "seatsRemaining",
-    ]
     target_col = "totalFare"
     sequence_length = 30
 
@@ -283,25 +330,65 @@ def preprocess_data(df):
         X_temp, y_temp, test_size=0.5, random_state=constants.RANDOM_STATE
     )
 
-    # Scale the features.
-    num_features = X_train.shape[2]
+    categorical_cols = [
+        "searchDayOfWeek",
+        "flightDayOfWeek",
+        "startingAirport_enc",
+        "destinationAirport_enc",
+        "searchMonth",
+        "flightMonth",
+        "departureHourUTC",
+    ]
+    cyclical_features = {
+        "searchDayOfWeek": 7,
+        "flightDayOfWeek": 7,
+        "searchMonth": 12,
+        "flightMonth": 12,
+        "departureHourUTC": 24,
+    }
+
+    # Determine numeric columns (i.e. features not in categorical_cols).
+    numeric_cols = [col for col in feature_cols if col not in categorical_cols]
+    numeric_indices = [feature_cols.index(col) for col in numeric_cols]
+
+    # Scale only numeric features using StandardScaler.
     scaler = StandardScaler()
-    X_train_scaled = scaler.fit_transform(X_train.reshape(-1, num_features)).reshape(
-        X_train.shape
+
+    # For training data: flatten numeric features, fit the scaler, then reshape and replace.
+    X_train_numeric = X_train[..., numeric_indices].reshape(-1, len(numeric_indices))
+    X_train_numeric_scaled = scaler.fit_transform(X_train_numeric).reshape(
+        X_train.shape[0], X_train.shape[1], len(numeric_indices)
     )
-    X_val_scaled = scaler.transform(X_val.reshape(-1, num_features)).reshape(
-        X_val.shape
+    X_train_scaled = X_train.copy()
+    X_train_scaled[..., numeric_indices] = X_train_numeric_scaled
+
+    # For validation data: transform the numeric features using the fitted scaler.
+    X_val_numeric = X_val[..., numeric_indices].reshape(-1, len(numeric_indices))
+    X_val_numeric_scaled = scaler.transform(X_val_numeric).reshape(
+        X_val.shape[0], X_val.shape[1], len(numeric_indices)
     )
-    X_test_scaled = scaler.transform(X_test.reshape(-1, num_features)).reshape(
-        X_test.shape
+    X_val_scaled = X_val.copy()
+    X_val_scaled[..., numeric_indices] = X_val_numeric_scaled
+
+    # For test data: transform the numeric features using the fitted scaler.
+    X_test_numeric = X_test[..., numeric_indices].reshape(-1, len(numeric_indices))
+    X_test_numeric_scaled = scaler.transform(X_test_numeric).reshape(
+        X_test.shape[0], X_test.shape[1], len(numeric_indices)
     )
+    X_test_scaled = X_test.copy()
+    X_test_scaled[..., numeric_indices] = X_test_numeric_scaled
+
+    # Apply cyclical encoding to the scaled datasets.
+    X_train_final = cyclical_encode(X_train_scaled, feature_cols, cyclical_features)
+    X_val_final = cyclical_encode(X_val_scaled, feature_cols, cyclical_features)
+    X_test_final = cyclical_encode(X_test_scaled, feature_cols, cyclical_features)
 
     data = {
-        "X_train_scaled": X_train_scaled,
+        "X_train_scaled": X_train_final,
         "y_train": y_train,
-        "X_val_scaled": X_val_scaled,
+        "X_val_scaled": X_val_final,
         "y_val": y_val,
-        "X_test_scaled": X_test_scaled,
+        "X_test_scaled": X_test_final,
         "y_test": y_test,
         "X_train": X_train,
         "X_val": X_val,
@@ -347,7 +434,7 @@ def get_data(force_reprocess=False):
 
 if __name__ == "__main__":
     # This will run the full pipeline only if cached files are missing.
-    data = get_data()
-    print("Train data shape:", data["X_train"].shape)
-    print("Validation data shape:", data["X_val"].shape)
-    print("Test data shape:", data["X_test"].shape)
+    data = get_data(force_reprocess=False)
+    print("Train data shape:", data["X_train_scaled"].shape)
+    print("Validation data shape:", data["X_val_scaled"].shape)
+    print("Test data shape:", data["X_test_scaled"].shape)
