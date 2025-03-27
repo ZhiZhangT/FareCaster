@@ -4,7 +4,7 @@ import time
 import os
 import sys
 from datetime import datetime
-from models import GRUModel, LSTMModel
+from models import GRUModel, LSTMModel, GRUModelDeep, LSTMModelDeep
 from torch.utils.data import TensorDataset, DataLoader
 from preprocess import get_data
 import matplotlib.pyplot as plt
@@ -231,7 +231,9 @@ def main():
 
     # Train GRU Model
     print("Training GRU model...")
-    gru_model = GRUModel(input_size=input_size)
+    gru_model = GRUModelDeep(
+        input_size=input_size, num_layers=5, fc_hidden_sizes=[512, 256, 128, 64, 32]
+    )
     gru_model, gru_losses = train_model(
         gru_model,
         train_loader,
@@ -245,12 +247,16 @@ def main():
 
     plot_losses(gru_losses, run_dir, "gru")
 
-    gru_test_loss, gru_test_mae = evaluate_model(gru_model, test_loader)
-    print(f"GRU Model Test Loss: {gru_test_loss:.4f}, Test MAE: {gru_test_mae:.4f}")
+    best_gru_val_loss, best_gru_val_mae = evaluate_model(gru_model, val_loader)
+    print(
+        f"BEST GRU Model Val Loss: {best_gru_val_loss:.4f}, Val MAE: {best_gru_val_mae:.4f}"
+    )
 
     # Train LSTM Model
     print("\nTraining LSTM model...")
-    lstm_model = LSTMModel(input_size=input_size)
+    lstm_model = LSTMModelDeep(
+        input_size=input_size, num_layers=5, fc_hidden_sizes=[512, 256, 128, 64, 32]
+    )
     lstm_model, lstm_losses = train_model(
         lstm_model,
         train_loader,
@@ -264,13 +270,18 @@ def main():
 
     plot_losses(lstm_losses, run_dir, "lstm")
 
-    lstm_test_loss, lstm_test_mae = evaluate_model(lstm_model, test_loader)
-    print(f"LSTM Model Test Loss: {lstm_test_loss:.4f}, Test MAE: {lstm_test_mae:.4f}")
+    best_lstm_val_loss, best_lstm_val_mae = evaluate_model(lstm_model, val_loader)
+    print(
+        f"BEST LSTM Model Val Loss: {best_lstm_val_loss:.4f}, Val MAE: {best_lstm_val_mae:.4f}"
+    )
 
     # Save experiment summary
     summary = {
-        "gru": {"test_loss": gru_test_loss, "test_mae": gru_test_mae},
-        "lstm": {"test_loss": lstm_test_loss, "test_mae": lstm_test_mae},
+        "gru": {"best_val_loss": best_gru_val_loss, "best_val_mae": best_gru_val_mae},
+        "lstm": {
+            "best_val_loss": best_lstm_val_loss,
+            "best_val_mae": best_lstm_val_mae,
+        },
     }
 
     with open(os.path.join(run_dir, "experiment_summary.json"), "w") as f:
