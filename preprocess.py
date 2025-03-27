@@ -297,12 +297,15 @@ def preprocess_data(df):
     )
 
     data = {
-        "X_train": X_train_scaled,
+        "X_train_scaled": X_train_scaled,
         "y_train": y_train,
-        "X_val": X_val_scaled,
+        "X_val_scaled": X_val_scaled,
         "y_val": y_val,
-        "X_test": X_test_scaled,
+        "X_test_scaled": X_test_scaled,
         "y_test": y_test,
+        "X_train": X_train,
+        "X_val": X_val,
+        "X_test": X_test,
     }
 
     with open(constants.SCALER_FILE, "wb") as f:

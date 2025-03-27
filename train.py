@@ -10,6 +10,7 @@ from preprocess import get_data
 import matplotlib.pyplot as plt
 import json
 
+
 # Create a timestamped run directory
 def create_run_directory(run_name="model_run"):
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -17,49 +18,58 @@ def create_run_directory(run_name="model_run"):
     os.makedirs(run_dir, exist_ok=True)
     return run_dir
 
+
 # Custom logger to save output to file and print to console
 class Logger:
     def __init__(self, log_file):
         self.terminal = sys.stdout
-        self.log_file = open(log_file, 'w')
-    
+        self.log_file = open(log_file, "w")
+
     def write(self, message):
         self.terminal.write(message)
         self.log_file.write(message)
         self.log_file.flush()
-    
+
     def flush(self):
         self.terminal.flush()
         self.log_file.flush()
-    
+
     def close(self):
         self.log_file.close()
 
+
 # Modified plot_losses function to save in the run directory
 def plot_losses(losses, save_dir, model_type):
-    train_losses = losses['train_losses']
-    val_losses = losses['val_losses']
-    
+    train_losses = losses["train_losses"]
+    val_losses = losses["val_losses"]
+
     plt.figure(figsize=(10, 6))
-    plt.plot(train_losses, label='Train Loss', color='blue')
-    plt.plot(val_losses, label='Val Loss', color='orange')
-    plt.xlabel('Epoch')
-    plt.ylabel('Loss')
-    plt.title(f'{model_type} Training and Validation Loss')
+    plt.plot(train_losses, label="Train Loss", color="blue")
+    plt.plot(val_losses, label="Val Loss", color="orange")
+    plt.xlabel("Epoch")
+    plt.ylabel("Loss")
+    plt.title(f"{model_type} Training and Validation Loss")
     plt.legend()
-    
+
     # Save the plot
-    plt.savefig(os.path.join(save_dir, f'{model_type}_loss_plot.png'))
+    plt.savefig(os.path.join(save_dir, f"{model_type}_loss_plot.png"))
     plt.close()
-    
+
     # Save the losses to a JSON file
-    with open(os.path.join(save_dir, f'{model_type}_losses.json'), 'w') as f:
+    with open(os.path.join(save_dir, f"{model_type}_losses.json"), "w") as f:
         json.dump(losses, f)
+
 
 # Modified training function to accept save directory
 def train_model(
-    model, train_loader, val_loader, num_epochs=10, lr=0.001, 
-    save_dir=None, model_type="model", loss_criteria=nn.MSELoss()
+    model,
+    train_loader,
+    val_loader,
+    num_epochs=10,
+    lr=0.001,
+    save_dir=None,
+    model_type="model",
+    loss_criteria=nn.MSELoss(),
 ):
     start_time = time.time()
     if torch.cuda.is_available():
@@ -76,12 +86,14 @@ def train_model(
 
     best_val_loss = float("inf")
     best_epoch = -1
-    
+
     # Lists to track losses
     train_losses = []
     val_losses = []
-    
-    model_save_path = os.path.join(save_dir, f"best_{model_type}_model.pt") if save_dir else None
+
+    model_save_path = (
+        os.path.join(save_dir, f"best_{model_type}_model.pt") if save_dir else None
+    )
 
     for epoch in range(num_epochs):
         start_time_epoch = time.time()
@@ -140,7 +152,7 @@ def train_model(
     print(f"Total time taken: {time.time() - start_time:.2f}s")
 
     # Return the model and the loss history
-    return model, {'train_losses': train_losses, 'val_losses': val_losses}
+    return model, {"train_losses": train_losses, "val_losses": val_losses}
 
 
 def evaluate_model(model, test_loader):
@@ -173,49 +185,50 @@ def evaluate_model(model, test_loader):
 # Main execution flow with run directory
 # -------------------------------
 
+
 def main():
     # Create run directory
     run_name = "price_prediction"
     run_dir = create_run_directory(run_name)
-    
+
     # Set up logging to capture all print statements
     sys.stdout = Logger(os.path.join(run_dir, "training_log.txt"))
-    
+
     print(f"Starting training run in directory: {run_dir}")
-    
+
     # Load and preprocess data
     data = get_data()
-    
-    X_train_scaled = data["X_train"]
+
+    X_train_scaled = data["X_train_scaled"]
     y_train = data["y_train"]
-    X_val_scaled = data["X_val"]
+    X_val_scaled = data["X_val_scaled"]
     y_val = data["y_val"]
-    X_test_scaled = data["X_test"]
+    X_test_scaled = data["X_test_scaled"]
     y_test = data["y_test"]
-    
+
     # Convert to PyTorch Tensors
     X_train_tensor = torch.tensor(X_train_scaled, dtype=torch.float32)
     y_train_tensor = torch.tensor(y_train, dtype=torch.float32).unsqueeze(1)
-    
+
     X_val_tensor = torch.tensor(X_val_scaled, dtype=torch.float32)
     y_val_tensor = torch.tensor(y_val, dtype=torch.float32).unsqueeze(1)
-    
+
     X_test_tensor = torch.tensor(X_test_scaled, dtype=torch.float32)
     y_test_tensor = torch.tensor(y_test, dtype=torch.float32).unsqueeze(1)
-    
+
     # Create DataLoaders
     batch_size = 32
     train_dataset = TensorDataset(X_train_tensor, y_train_tensor)
     val_dataset = TensorDataset(X_val_tensor, y_val_tensor)
     test_dataset = TensorDataset(X_test_tensor, y_test_tensor)
-    
+
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=batch_size)
     test_loader = DataLoader(test_dataset, batch_size=batch_size)
-    
+
     input_size = X_train_scaled.shape[2]  # number of features
     print(f"input_size (number of features): {input_size}")
-    
+
     # Train GRU Model
     print("Training GRU model...")
     gru_model = GRUModel(input_size=input_size)
@@ -227,14 +240,14 @@ def main():
         lr=0.005,
         save_dir=run_dir,
         model_type="gru",
-        loss_criteria=nn.MSELoss()
+        loss_criteria=nn.MSELoss(),
     )
-    
+
     plot_losses(gru_losses, run_dir, "gru")
-    
+
     gru_test_loss, gru_test_mae = evaluate_model(gru_model, test_loader)
     print(f"GRU Model Test Loss: {gru_test_loss:.4f}, Test MAE: {gru_test_mae:.4f}")
-    
+
     # Train LSTM Model
     print("\nTraining LSTM model...")
     lstm_model = LSTMModel(input_size=input_size)
@@ -246,32 +259,27 @@ def main():
         lr=0.005,
         save_dir=run_dir,
         model_type="lstm",
-        loss_criteria=nn.MSELoss()
+        loss_criteria=nn.MSELoss(),
     )
-    
+
     plot_losses(lstm_losses, run_dir, "lstm")
-    
+
     lstm_test_loss, lstm_test_mae = evaluate_model(lstm_model, test_loader)
     print(f"LSTM Model Test Loss: {lstm_test_loss:.4f}, Test MAE: {lstm_test_mae:.4f}")
-    
+
     # Save experiment summary
     summary = {
-        "gru": {
-            "test_loss": gru_test_loss,
-            "test_mae": gru_test_mae
-        },
-        "lstm": {
-            "test_loss": lstm_test_loss,
-            "test_mae": lstm_test_mae
-        }
+        "gru": {"test_loss": gru_test_loss, "test_mae": gru_test_mae},
+        "lstm": {"test_loss": lstm_test_loss, "test_mae": lstm_test_mae},
     }
-    
-    with open(os.path.join(run_dir, "experiment_summary.json"), 'w') as f:
+
+    with open(os.path.join(run_dir, "experiment_summary.json"), "w") as f:
         json.dump(summary, f, indent=4)
-    
+
     # Close the logger
     sys.stdout.close()
     sys.stdout = sys.__stdout__
+
 
 if __name__ == "__main__":
     main()
