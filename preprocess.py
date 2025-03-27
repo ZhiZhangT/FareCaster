@@ -380,9 +380,6 @@ def preprocess_data(
         "y_val": y_val,
         "X_test_scaled": X_test_final,
         "y_test": y_test,
-        "X_train": X_train,
-        "X_val": X_val,
-        "X_test": X_test,
         "X_train_sliding_window_scaled": X_train_sliding_final,
         "y_train_sliding_window": y_train_sliding,
         "X_val_sliding_window_scaled": X_val_sliding_final,
@@ -430,7 +427,7 @@ def get_data(force_reprocess=False):
 
 if __name__ == "__main__":
     # This will run the full pipeline only if cached files are missing.
-    data = get_data(force_reprocess=False)
+    data = get_data(force_reprocess=True)
     print("Train data shape:", data["X_train_scaled"].shape)
     print("Validation data shape:", data["X_val_scaled"].shape)
     print("Test data shape:", data["X_test_scaled"].shape)
