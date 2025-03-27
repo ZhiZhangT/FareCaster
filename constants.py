@@ -6,8 +6,6 @@ RAW_DATA_PATH = "data/itineraries_10perc.csv"
 PROCESSED_DATA_FILE = f"{SAVED_DIR}preprocessed_data.pkl"
 SCALER_FILE = f"{SAVED_DIR}scaler.pkl"
 FEATURE_COLS = [
-    "searchDate_ordinal",
-    "flightDate_ordinal",
     "startingAirport_enc",
     "destinationAirport_enc",
     "seatsRemaining",
