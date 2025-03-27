@@ -28,7 +28,7 @@ def parse_date(date_str):
 def preprocess_grouped_dataframe(groups, fit=True, le_start=None, le_dest=None):
     """
     Preprocess a dictionary of DataFrame groups (output of group_routes_by_flight_date).
-    For each group, parse dates, create ordinal columns, and encode categorical features.
+    For each group, parse dates, and encode categorical features.
 
     Parameters:
       groups: dict
@@ -46,7 +46,6 @@ def preprocess_grouped_dataframe(groups, fit=True, le_start=None, le_dest=None):
       (le_start, le_dest): tuple
           The fitted label encoders.
     """
-    # First, process each group individually (parse dates and create ordinal columns)
     processed_groups = {}
     for key, df in groups.items():
         df = df.copy()
@@ -60,10 +59,6 @@ def preprocess_grouped_dataframe(groups, fit=True, le_start=None, le_dest=None):
             df["segmentsDepartureTime"] = pd.to_datetime(
                 df["segmentsDepartureTimeEpochSeconds"], unit="s"
             )
-
-        # Create ordinal columns
-        df["searchDate_ordinal"] = df["searchDate"].apply(lambda x: x.toordinal())
-        df["flightDate_ordinal"] = df["flightDate"].apply(lambda x: x.toordinal())
 
         # day of week (0 = Monday, 6 = Sunday)
         df["searchDayOfWeek"] = df["searchDate"].dt.weekday
@@ -107,41 +102,6 @@ def preprocess_grouped_dataframe(groups, fit=True, le_start=None, le_dest=None):
         processed_groups[key] = df
 
     return processed_groups
-
-
-def preprocess_sample(raw_sample, le_start, le_dest, scaler):
-    """
-    Preprocess a raw sample for prediction.
-
-    Parameters:
-      raw_sample (array-like): A 2D array-like structure where each row contains:
-          [searchDate, flightDate, startingAirport, destinationAirport, seatsRemaining]
-      le_start (LabelEncoder): Pre-fitted LabelEncoder for 'startingAirport'.
-      le_dest (LabelEncoder): Pre-fitted LabelEncoder for 'destinationAirport'.
-      scaler (StandardScaler): Pre-fitted StandardScaler.
-
-    Returns:
-      processed_sample_scaled (np.ndarray): A scaled numpy array of shape (n_samples, 5).
-    """
-    processed_samples = []
-    for row in raw_sample:
-        search_date_ord = parse_date(row[0]).toordinal()
-        flight_date_ord = parse_date(row[1]).toordinal()
-        starting_airport_enc = le_start.transform([row[2]])[0]
-        destination_airport_enc = le_dest.transform([row[3]])[0]
-        seats_remaining = float(row[4])
-        processed_samples.append(
-            [
-                search_date_ord,
-                flight_date_ord,
-                starting_airport_enc,
-                destination_airport_enc,
-                seats_remaining,
-            ]
-        )
-    processed_samples = np.array(processed_samples, dtype=float)
-    processed_sample_scaled = scaler.transform(processed_samples)
-    return processed_sample_scaled
 
 
 def group_routes_by_flight_date(dataframe):
@@ -305,16 +265,6 @@ def preprocess_data(df, feature_cols=constants.FEATURE_COLS):
         group = group.sort_values("searchDate").reset_index(drop=True)
         # get the last 30 days of data
         window = group.iloc[-sequence_length:]
-
-        # Compute ordinals if they don't exist
-        if "searchDate_ordinal" not in window.columns:
-            window["searchDate_ordinal"] = window["searchDate"].apply(
-                lambda x: x.toordinal()
-            )
-        if "flightDate_ordinal" not in window.columns:
-            window["flightDate_ordinal"] = window["flightDate"].apply(
-                lambda x: x.toordinal()
-            )
 
         sequences.append(window[feature_cols].values)
         targets.append(window[target_col].values[-1])
