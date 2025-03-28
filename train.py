@@ -1,3 +1,4 @@
+import math
 import torch
 import torch.nn as nn
 import time
@@ -9,6 +10,7 @@ from torch.utils.data import TensorDataset, DataLoader
 from preprocess import get_data
 import matplotlib.pyplot as plt
 import json
+import numpy as np
 
 
 # Create a timestamped run directory
@@ -155,7 +157,7 @@ def train_model(
     return model, {"train_losses": train_losses, "val_losses": val_losses}
 
 
-def evaluate_model(model, test_loader):
+def evaluate_model(model, test_loader, loss_criteria):
     if torch.cuda.is_available():
         device = torch.device("cuda")
     elif torch.mps.is_available():
@@ -165,7 +167,7 @@ def evaluate_model(model, test_loader):
     print(f"Evaluating on device: {device}")
     model.to(device)
     model.eval()
-    criterion = nn.MSELoss()
+    criterion = loss_criteria
     test_loss = 0.0
     total_abs_error = 0.0
     with torch.no_grad():
@@ -181,12 +183,49 @@ def evaluate_model(model, test_loader):
     return test_loss, mae
 
 
+
+def create_sliding_windows(data, sequence_length):
+    """
+    Create sliding windows of specified length from input data.
+    
+    Args:
+        data: Input data of shape (batch_size, seq_len, feature_dim)
+        sequence_length: Length of the subsequences to create
+        
+    Returns:
+        Array of shape (new_batch_size, sequence_length, feature_dim)
+    """
+    batch_size, seq_len, feature_dim = data.shape
+    if sequence_length >= seq_len:
+        return data  # No sliding needed if requested length is equal or longer
+    
+    # Number of sliding windows per original sequence
+    num_windows = seq_len - sequence_length + 1
+    
+    # Initialize output array
+    windowed_data = []
+    
+    # Create sliding windows
+    for i in range(batch_size):
+        for j in range(num_windows):
+            window = data[i, j:j+sequence_length, :]
+            windowed_data.append(window)
+    
+    # Stack along batch dimension
+    return np.stack(windowed_data, axis=0)
+
 # -------------------------------
 # Main execution flow with run directory
 # -------------------------------
 
-
-def main():
+def main(
+    batch_size=32,
+    num_epochs=50,
+    lr=0.005,
+    num_layers=5,
+    fc_hidden_sizes=[512, 256, 128, 64, 32],
+    sequence_length=30  # Default to full length
+):
     # Create run directory
     run_name = "price_prediction"
     run_dir = create_run_directory(run_name)
@@ -195,9 +234,18 @@ def main():
     sys.stdout = Logger(os.path.join(run_dir, "training_log.txt"))
 
     print(f"Starting training run in directory: {run_dir}")
+    
+    # Log hyperparameters
+    print(f"Hyperparameters:")
+    print(f"  batch_size: {batch_size}")
+    print(f"  num_epochs: {num_epochs}")
+    print(f"  learning rate: {lr}")
+    print(f"  num_layers: {num_layers}")
+    print(f"  fc_hidden_sizes: {fc_hidden_sizes}")
+    print(f"  sequence_length: {sequence_length}")
 
     # Load and preprocess data
-    data = get_data()
+    data = get_data(sequence_length=sequence_length)
 
     X_train_scaled = data["X_train_scaled"]
     y_train = data["y_train"]
@@ -205,7 +253,7 @@ def main():
     y_val = data["y_val"]
     X_test_scaled = data["X_test_scaled"]
     y_test = data["y_test"]
-
+    
     # Convert to PyTorch Tensors
     X_train_tensor = torch.tensor(X_train_scaled, dtype=torch.float32)
     y_train_tensor = torch.tensor(y_train, dtype=torch.float32).unsqueeze(1)
@@ -217,7 +265,6 @@ def main():
     y_test_tensor = torch.tensor(y_test, dtype=torch.float32).unsqueeze(1)
 
     # Create DataLoaders
-    batch_size = 32
     train_dataset = TensorDataset(X_train_tensor, y_train_tensor)
     val_dataset = TensorDataset(X_val_tensor, y_val_tensor)
     test_dataset = TensorDataset(X_test_tensor, y_test_tensor)
@@ -232,14 +279,14 @@ def main():
     # Train GRU Model
     print("Training GRU model...")
     gru_model = GRUModelDeep(
-        input_size=input_size, num_layers=5, fc_hidden_sizes=[512, 256, 128, 64, 32]
+        input_size=input_size, num_layers=num_layers, fc_hidden_sizes=fc_hidden_sizes
     )
     gru_model, gru_losses = train_model(
         gru_model,
         train_loader,
         val_loader,
-        num_epochs=50,
-        lr=0.005,
+        num_epochs=num_epochs,
+        lr=lr,
         save_dir=run_dir,
         model_type="gru",
         loss_criteria=nn.MSELoss(),
@@ -247,7 +294,7 @@ def main():
 
     plot_losses(gru_losses, run_dir, "gru")
 
-    best_gru_val_loss, best_gru_val_mae = evaluate_model(gru_model, val_loader)
+    best_gru_val_loss, best_gru_val_mae = evaluate_model(gru_model, val_loader, nn.MSELoss())
     print(
         f"BEST GRU Model Val Loss: {best_gru_val_loss:.4f}, Val MAE: {best_gru_val_mae:.4f}"
     )
@@ -255,14 +302,14 @@ def main():
     # Train LSTM Model
     print("\nTraining LSTM model...")
     lstm_model = LSTMModelDeep(
-        input_size=input_size, num_layers=5, fc_hidden_sizes=[512, 256, 128, 64, 32]
+        input_size=input_size, num_layers=num_layers, fc_hidden_sizes=fc_hidden_sizes
     )
     lstm_model, lstm_losses = train_model(
         lstm_model,
         train_loader,
         val_loader,
-        num_epochs=50,
-        lr=0.005,
+        num_epochs=num_epochs,
+        lr=lr,
         save_dir=run_dir,
         model_type="lstm",
         loss_criteria=nn.MSELoss(),
@@ -270,13 +317,21 @@ def main():
 
     plot_losses(lstm_losses, run_dir, "lstm")
 
-    best_lstm_val_loss, best_lstm_val_mae = evaluate_model(lstm_model, val_loader)
+    best_lstm_val_loss, best_lstm_val_mae = evaluate_model(lstm_model, val_loader, nn.MSELoss())
     print(
         f"BEST LSTM Model Val Loss: {best_lstm_val_loss:.4f}, Val MAE: {best_lstm_val_mae:.4f}"
     )
 
     # Save experiment summary
     summary = {
+        "hyperparameters": {
+            "batch_size": batch_size,
+            "num_epochs": num_epochs,
+            "learning_rate": lr,
+            "num_layers": num_layers,
+            "fc_hidden_sizes": fc_hidden_sizes,
+            "sequence_length": sequence_length
+        },
         "gru": {"best_val_loss": best_gru_val_loss, "best_val_mae": best_gru_val_mae},
         "lstm": {
             "best_val_loss": best_lstm_val_loss,
@@ -291,6 +346,19 @@ def main():
     sys.stdout.close()
     sys.stdout = sys.__stdout__
 
-
 if __name__ == "__main__":
-    main()
+    batch_size=32,
+    num_epochs=50,
+    lr=0.005,
+    num_layers=5,
+    fc_hidden_sizes=[512, 256, 128, 64, 32],
+    sequence_length=30
+    
+    main(
+        batch_size=batch_size,
+        num_epochs=num_epochs,
+        lr=lr,
+        num_layers=num_layers,
+        fc_hidden_sizes=fc_hidden_sizes,
+        sequence_length=sequence_length
+    )

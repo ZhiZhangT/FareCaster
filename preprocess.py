@@ -274,6 +274,7 @@ def preprocess_data(
     feature_cols=constants.FEATURE_COLS,
     categorical_cols=constants.CATEGORICAL_COLS,
     cyclical_features=constants.CYCLICAL_FEATURES,
+    sequence_length=30,
 ):
     # NOTE: these fields have to be added before group_routes_by_flight_date as they are used in the function
     # Convert epoch seconds to datetime
@@ -295,13 +296,12 @@ def preprocess_data(
         f"Time taken to run preprocess_grouped_dataframe(): {time.time() - start_time:.2f} seconds"
     )
 
-    # Filter groups with at least 30 search dates
+    # Filter groups with at least sequence_length number of search dates
     filtered_groups = {
-        key: group for key, group in processed_groups.items() if len(group) >= 30
+        key: group for key, group in processed_groups.items() if len(group) >= sequence_length
     }
 
     target_col = "totalFare"
-    sequence_length = 30
 
     # --- Split into train/test/validation first ---
 
@@ -409,7 +409,7 @@ def load_processed_data(data_filepath=constants.PROCESSED_DATA_FILE):
 
 
 # Main function to get data. It will load from cache if available unless forced to reprocess.
-def get_data(force_reprocess=False):
+def get_data(force_reprocess=False, sequence_length=30):
     if (
         not force_reprocess
         and os.path.exists(constants.PROCESSED_DATA_FILE)
@@ -420,7 +420,7 @@ def get_data(force_reprocess=False):
     else:
         print("Processing raw data...")
         df = load_raw_data()
-        data = preprocess_data(df)
+        data = preprocess_data(df, sequence_length)
         save_processed_data(data)
         return data
 
