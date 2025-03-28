@@ -238,7 +238,9 @@ def main(
     lr=0.005,
     num_layers=5,
     fc_hidden_sizes=[512, 256, 128, 64, 32],
-    sequence_length=30  # Default to full length
+    sequence_length=30,  # Default to full length
+    train_loss_criteria=nn.MSELoss(),
+    val_loss_criteria=nn.MSELoss()
 ):
     # Create run directory
     run_name = "price_prediction"
@@ -303,12 +305,12 @@ def main(
         lr=lr,
         save_dir=run_dir,
         model_type="gru",
-        loss_criteria=nn.MSELoss(),
+        loss_criteria=train_loss_criteria,
     )
 
     plot_losses(gru_losses, run_dir, "gru")
 
-    best_gru_val_loss, best_gru_val_mae = evaluate_model(gru_model, val_loader, nn.MSELoss())
+    best_gru_val_loss, best_gru_val_mae = evaluate_model(gru_model, val_loader, val_loss_criteria)
     print(
         f"BEST GRU Model Val Loss: {best_gru_val_loss:.4f}, Val MAE: {best_gru_val_mae:.4f}"
     )
@@ -326,12 +328,12 @@ def main(
         lr=lr,
         save_dir=run_dir,
         model_type="lstm",
-        loss_criteria=nn.MSELoss(),
+        loss_criteria=train_loss_criteria,
     )
 
     plot_losses(lstm_losses, run_dir, "lstm")
 
-    best_lstm_val_loss, best_lstm_val_mae = evaluate_model(lstm_model, val_loader, nn.MSELoss())
+    best_lstm_val_loss, best_lstm_val_mae = evaluate_model(lstm_model, val_loader, val_loss_criteria)
     print(
         f"BEST LSTM Model Val Loss: {best_lstm_val_loss:.4f}, Val MAE: {best_lstm_val_mae:.4f}"
     )
@@ -362,11 +364,13 @@ def main(
 
 if __name__ == "__main__":
     batch_size=32,
-    num_epochs=50,
-    lr=0.005,
-    num_layers=5,
-    fc_hidden_sizes=[512, 256, 128, 64, 32],
+    num_epochs=50
+    lr=0.005
+    num_layers=5
+    fc_hidden_sizes=[512, 256, 128, 64, 32]
     sequence_length=30
+    train_loss_criteria=nn.MSELoss()
+    val_loss_criteria=nn.MSELoss()
     
     main(
         batch_size=batch_size,
@@ -374,5 +378,7 @@ if __name__ == "__main__":
         lr=lr,
         num_layers=num_layers,
         fc_hidden_sizes=fc_hidden_sizes,
-        sequence_length=sequence_length
+        sequence_length=sequence_length,
+        train_loss_criteria=train_loss_criteria,
+        val_loss_criteria=val_loss_criteria
     )
