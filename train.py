@@ -90,7 +90,7 @@ def train_model(
     start_time = time.time()
     if torch.cuda.is_available():
         device = torch.device("cuda")
-    elif torch.mps.is_available():
+    elif torch.backends.mps.is_available():
         device = torch.device("mps")
     else:
         device = torch.device("cpu")
@@ -174,7 +174,7 @@ def train_model(
 def evaluate_model(model, test_loader, loss_criteria):
     if torch.cuda.is_available():
         device = torch.device("cuda")
-    elif torch.mps.is_available():
+    elif torch.backends.mps.is_available():
         device = torch.device("mps")
     else:
         device = torch.device("cpu")
@@ -240,10 +240,10 @@ def main(
     fc_hidden_sizes=[512, 256, 128, 64, 32],
     sequence_length=30,  # Default to full length
     train_loss_criteria=nn.MSELoss(),
-    val_loss_criteria=nn.MSELoss()
+    val_loss_criteria=nn.MSELoss(),
+    run_name="price_prediction",
 ):
     # Create run directory
-    run_name = "price_prediction"
     run_dir = create_run_directory(run_name)
 
     # Set up logging to capture all print statements
@@ -363,14 +363,15 @@ def main(
     sys.stdout = sys.__stdout__
 
 if __name__ == "__main__":
-    batch_size=32,
+    batch_size=32
     num_epochs=50
     lr=0.005
     num_layers=5
     fc_hidden_sizes=[512, 256, 128, 64, 32]
     sequence_length=30
-    train_loss_criteria=nn.MSELoss()
+    train_loss_criteria=LogCoshLoss()
     val_loss_criteria=nn.MSELoss()
+    run_name = "LogCoshLoss_train_loss"
     
     main(
         batch_size=batch_size,
@@ -380,5 +381,6 @@ if __name__ == "__main__":
         fc_hidden_sizes=fc_hidden_sizes,
         sequence_length=sequence_length,
         train_loss_criteria=train_loss_criteria,
-        val_loss_criteria=val_loss_criteria
+        val_loss_criteria=val_loss_criteria,
+        run_name=run_name,
     )

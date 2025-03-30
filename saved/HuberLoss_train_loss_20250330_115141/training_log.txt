@@ -1,0 +1,231 @@
+Starting training run in directory: saved/HuberLoss_train_loss_20250330_115141
+Hyperparameters:
+  batch_size: 32
+  num_epochs: 50
+  learning rate: 0.005
+  num_layers: 5
+  fc_hidden_sizes: [512, 256, 128, 64, 32]
+  sequence_length: 30
+Loading preprocessed data and scaler from disk...
+input_size (number of features): 14
+Training GRU model...
+Training on device: mps
+Epoch 1/50, Train Loss: 3484.7814, Val Loss: 6216.5763
+Saved best model at epoch 1 with val loss 6216.5763
+Time taken for epoch 1: 80.28s
+Epoch 2/50, Train Loss: 3330.9382, Val Loss: 6274.8843
+Time taken for epoch 2: 70.71s
+Epoch 3/50, Train Loss: 3337.8488, Val Loss: 6449.5805
+Time taken for epoch 3: 70.52s
+Epoch 4/50, Train Loss: 3305.7788, Val Loss: 7087.6855
+Time taken for epoch 4: 70.96s
+Epoch 5/50, Train Loss: 3302.1230, Val Loss: 6457.0377
+Time taken for epoch 5: 71.35s
+Epoch 6/50, Train Loss: 3288.0523, Val Loss: 5958.4902
+Saved best model at epoch 6 with val loss 5958.4902
+Time taken for epoch 6: 70.32s
+Epoch 7/50, Train Loss: 3230.0979, Val Loss: 6098.2651
+Time taken for epoch 7: 70.72s
+Epoch 8/50, Train Loss: 3258.2117, Val Loss: 5728.2165
+Saved best model at epoch 8 with val loss 5728.2165
+Time taken for epoch 8: 70.60s
+Epoch 9/50, Train Loss: 3272.3844, Val Loss: 6141.7200
+Time taken for epoch 9: 71.16s
+Epoch 10/50, Train Loss: 3224.9907, Val Loss: 6170.1692
+Time taken for epoch 10: 70.50s
+Epoch 11/50, Train Loss: 3221.3476, Val Loss: 5935.3945
+Time taken for epoch 11: 70.52s
+Epoch 12/50, Train Loss: 3197.1790, Val Loss: 6604.4833
+Time taken for epoch 12: 70.55s
+Epoch 13/50, Train Loss: 3197.7922, Val Loss: 5960.1698
+Time taken for epoch 13: 70.98s
+Epoch 14/50, Train Loss: 3195.4440, Val Loss: 5825.7451
+Time taken for epoch 14: 70.63s
+Epoch 15/50, Train Loss: 3203.8160, Val Loss: 5524.2983
+Saved best model at epoch 15 with val loss 5524.2983
+Time taken for epoch 15: 70.52s
+Epoch 16/50, Train Loss: 3202.6849, Val Loss: 5882.8600
+Time taken for epoch 16: 70.47s
+Epoch 17/50, Train Loss: 3171.7466, Val Loss: 5871.2588
+Time taken for epoch 17: 70.62s
+Epoch 18/50, Train Loss: 3178.8760, Val Loss: 6175.1286
+Time taken for epoch 18: 71.14s
+Epoch 19/50, Train Loss: 3174.3431, Val Loss: 6272.6455
+Time taken for epoch 19: 70.50s
+Epoch 20/50, Train Loss: 3150.9995, Val Loss: 6159.5780
+Time taken for epoch 20: 70.62s
+Epoch 21/50, Train Loss: 3114.1767, Val Loss: 6233.3976
+Time taken for epoch 21: 70.39s
+Epoch 22/50, Train Loss: 3113.5932, Val Loss: 6265.9756
+Time taken for epoch 22: 71.07s
+Epoch 23/50, Train Loss: 3129.4088, Val Loss: 5490.0829
+Saved best model at epoch 23 with val loss 5490.0829
+Time taken for epoch 23: 70.57s
+Epoch 24/50, Train Loss: 3118.8898, Val Loss: 6187.4478
+Time taken for epoch 24: 70.69s
+Epoch 25/50, Train Loss: 3084.7019, Val Loss: 6451.9878
+Time taken for epoch 25: 70.78s
+Epoch 26/50, Train Loss: 2973.5917, Val Loss: 5912.1582
+Time taken for epoch 26: 71.98s
+Epoch 27/50, Train Loss: 2922.6373, Val Loss: 6194.5268
+Time taken for epoch 27: 70.26s
+Epoch 28/50, Train Loss: 2886.6497, Val Loss: 6105.4156
+Time taken for epoch 28: 69.93s
+Epoch 29/50, Train Loss: 2855.0176, Val Loss: 5767.9677
+Time taken for epoch 29: 69.66s
+Epoch 30/50, Train Loss: 2839.5541, Val Loss: 6156.9511
+Time taken for epoch 30: 70.44s
+Epoch 31/50, Train Loss: 2840.3076, Val Loss: 6494.8434
+Time taken for epoch 31: 70.03s
+Epoch 32/50, Train Loss: 2814.3955, Val Loss: 6301.8000
+Time taken for epoch 32: 69.74s
+Epoch 33/50, Train Loss: 2816.8028, Val Loss: 6121.1229
+Time taken for epoch 33: 69.72s
+Epoch 34/50, Train Loss: 2774.3346, Val Loss: 5990.5783
+Time taken for epoch 34: 69.66s
+Epoch 35/50, Train Loss: 2751.2427, Val Loss: 6137.9591
+Time taken for epoch 35: 70.31s
+Epoch 36/50, Train Loss: 2773.3816, Val Loss: 5905.2497
+Time taken for epoch 36: 69.65s
+Epoch 37/50, Train Loss: 2750.9977, Val Loss: 6092.2330
+Time taken for epoch 37: 69.27s
+Epoch 38/50, Train Loss: 2778.8241, Val Loss: 6415.3197
+Time taken for epoch 38: 69.24s
+Epoch 39/50, Train Loss: 2727.4460, Val Loss: 6118.3439
+Time taken for epoch 39: 69.97s
+Epoch 40/50, Train Loss: 2700.2211, Val Loss: 5943.5206
+Time taken for epoch 40: 69.42s
+Epoch 41/50, Train Loss: 2722.5827, Val Loss: 5956.9157
+Time taken for epoch 41: 69.34s
+Epoch 42/50, Train Loss: 2769.2345, Val Loss: 5654.4068
+Time taken for epoch 42: 69.29s
+Epoch 43/50, Train Loss: 2760.5423, Val Loss: 6365.0135
+Time taken for epoch 43: 73.50s
+Epoch 44/50, Train Loss: 2836.5501, Val Loss: 6536.9104
+Time taken for epoch 44: 72.77s
+Epoch 45/50, Train Loss: 2793.0903, Val Loss: 5964.7484
+Time taken for epoch 45: 72.06s
+Epoch 46/50, Train Loss: 2753.0549, Val Loss: 6121.6955
+Time taken for epoch 46: 72.05s
+Epoch 47/50, Train Loss: 2832.0827, Val Loss: 5904.4819
+Time taken for epoch 47: 68.36s
+Epoch 48/50, Train Loss: 2776.4618, Val Loss: 6273.2612
+Time taken for epoch 48: 78.51s
+Epoch 49/50, Train Loss: 2797.3130, Val Loss: 5888.9831
+Time taken for epoch 49: 80.10s
+Epoch 50/50, Train Loss: 2750.0442, Val Loss: 6165.1601
+Time taken for epoch 50: 83.31s
+Loaded best model from epoch 23 with val loss 5490.0829
+Total time taken: 3567.05s
+Evaluating on device: mps
+BEST GRU Model Val Loss: 85325.6985, Val MAE: 197.7146
+
+Training LSTM model...
+Training on device: mps
+Epoch 1/50, Train Loss: 3441.2329, Val Loss: 6702.6074
+Saved best model at epoch 1 with val loss 6702.6074
+Time taken for epoch 1: 10.33s
+Epoch 2/50, Train Loss: 3265.4181, Val Loss: 6909.5090
+Time taken for epoch 2: 16.64s
+Epoch 3/50, Train Loss: 3213.8893, Val Loss: 6992.1032
+Time taken for epoch 3: 11.30s
+Epoch 4/50, Train Loss: 3238.5215, Val Loss: 6566.8418
+Saved best model at epoch 4 with val loss 6566.8418
+Time taken for epoch 4: 10.32s
+Epoch 5/50, Train Loss: 3205.8175, Val Loss: 6337.2075
+Saved best model at epoch 5 with val loss 6337.2075
+Time taken for epoch 5: 9.09s
+Epoch 6/50, Train Loss: 3159.8414, Val Loss: 6966.1456
+Time taken for epoch 6: 10.12s
+Epoch 7/50, Train Loss: 3122.6202, Val Loss: 7186.6735
+Time taken for epoch 7: 7.85s
+Epoch 8/50, Train Loss: 3117.0399, Val Loss: 6674.7066
+Time taken for epoch 8: 8.17s
+Epoch 9/50, Train Loss: 3166.1748, Val Loss: 6947.0387
+Time taken for epoch 9: 8.15s
+Epoch 10/50, Train Loss: 3087.1099, Val Loss: 6959.2090
+Time taken for epoch 10: 8.06s
+Epoch 11/50, Train Loss: 3101.6942, Val Loss: 6830.6385
+Time taken for epoch 11: 8.37s
+Epoch 12/50, Train Loss: 3066.1719, Val Loss: 7070.4978
+Time taken for epoch 12: 8.10s
+Epoch 13/50, Train Loss: 3069.7107, Val Loss: 6539.6362
+Time taken for epoch 13: 8.66s
+Epoch 14/50, Train Loss: 3059.1088, Val Loss: 6753.8190
+Time taken for epoch 14: 8.25s
+Epoch 15/50, Train Loss: 3054.5116, Val Loss: 6728.4943
+Time taken for epoch 15: 8.10s
+Epoch 16/50, Train Loss: 3011.2484, Val Loss: 6865.5698
+Time taken for epoch 16: 8.24s
+Epoch 17/50, Train Loss: 2999.7256, Val Loss: 7122.7458
+Time taken for epoch 17: 8.15s
+Epoch 18/50, Train Loss: 3002.0120, Val Loss: 6774.8368
+Time taken for epoch 18: 8.03s
+Epoch 19/50, Train Loss: 2941.3248, Val Loss: 6802.4543
+Time taken for epoch 19: 8.30s
+Epoch 20/50, Train Loss: 2932.1010, Val Loss: 6685.1678
+Time taken for epoch 20: 7.83s
+Epoch 21/50, Train Loss: 2961.0656, Val Loss: 6994.4977
+Time taken for epoch 21: 8.61s
+Epoch 22/50, Train Loss: 2952.3451, Val Loss: 7057.8838
+Time taken for epoch 22: 7.95s
+Epoch 23/50, Train Loss: 3015.6399, Val Loss: 6814.8252
+Time taken for epoch 23: 8.16s
+Epoch 24/50, Train Loss: 2967.0861, Val Loss: 6903.9298
+Time taken for epoch 24: 8.03s
+Epoch 25/50, Train Loss: 2948.1218, Val Loss: 6494.1036
+Time taken for epoch 25: 7.88s
+Epoch 26/50, Train Loss: 2944.6817, Val Loss: 6872.9135
+Time taken for epoch 26: 7.95s
+Epoch 27/50, Train Loss: 3004.7250, Val Loss: 6834.0593
+Time taken for epoch 27: 7.67s
+Epoch 28/50, Train Loss: 2943.2303, Val Loss: 6814.6475
+Time taken for epoch 28: 7.82s
+Epoch 29/50, Train Loss: 2921.8455, Val Loss: 6709.5676
+Time taken for epoch 29: 8.38s
+Epoch 30/50, Train Loss: 2958.2858, Val Loss: 6589.0955
+Time taken for epoch 30: 8.24s
+Epoch 31/50, Train Loss: 2951.2163, Val Loss: 6923.0728
+Time taken for epoch 31: 7.81s
+Epoch 32/50, Train Loss: 2927.4678, Val Loss: 6693.9909
+Time taken for epoch 32: 7.89s
+Epoch 33/50, Train Loss: 2953.8949, Val Loss: 6767.6837
+Time taken for epoch 33: 7.97s
+Epoch 34/50, Train Loss: 2938.3983, Val Loss: 6549.7730
+Time taken for epoch 34: 9.10s
+Epoch 35/50, Train Loss: 2938.2267, Val Loss: 6522.0562
+Time taken for epoch 35: 7.88s
+Epoch 36/50, Train Loss: 2977.8391, Val Loss: 6749.6564
+Time taken for epoch 36: 7.89s
+Epoch 37/50, Train Loss: 2938.0780, Val Loss: 6713.9231
+Time taken for epoch 37: 8.44s
+Epoch 38/50, Train Loss: 2948.9536, Val Loss: 6546.5612
+Time taken for epoch 38: 8.31s
+Epoch 39/50, Train Loss: 2951.2457, Val Loss: 6777.2507
+Time taken for epoch 39: 7.97s
+Epoch 40/50, Train Loss: 3000.3162, Val Loss: 6378.1207
+Time taken for epoch 40: 7.90s
+Epoch 41/50, Train Loss: 3027.0735, Val Loss: 6712.5884
+Time taken for epoch 41: 7.95s
+Epoch 42/50, Train Loss: 3084.5523, Val Loss: 6575.9494
+Time taken for epoch 42: 7.93s
+Epoch 43/50, Train Loss: 3018.4581, Val Loss: 6925.2809
+Time taken for epoch 43: 8.31s
+Epoch 44/50, Train Loss: 3014.2400, Val Loss: 6853.2131
+Time taken for epoch 44: 7.89s
+Epoch 45/50, Train Loss: 3011.0876, Val Loss: 6996.8636
+Time taken for epoch 45: 8.66s
+Epoch 46/50, Train Loss: 3035.2106, Val Loss: 6707.9684
+Time taken for epoch 46: 7.81s
+Epoch 47/50, Train Loss: 2977.1393, Val Loss: 6747.5339
+Time taken for epoch 47: 8.29s
+Epoch 48/50, Train Loss: 3079.9358, Val Loss: 6649.1280
+Time taken for epoch 48: 8.06s
+Epoch 49/50, Train Loss: 3097.0402, Val Loss: 6698.9145
+Time taken for epoch 49: 7.76s
+Epoch 50/50, Train Loss: 3050.7781, Val Loss: 6603.3128
+Time taken for epoch 50: 7.70s
+Loaded best model from epoch 5 with val loss 6337.2075
+Total time taken: 424.30s
+Evaluating on device: mps
+BEST LSTM Model Val Loss: 97879.3400, Val MAE: 226.0749
