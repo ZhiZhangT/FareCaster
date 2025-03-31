@@ -196,38 +196,6 @@ def evaluate_model(model, test_loader, loss_criteria):
     mae = total_abs_error / len(test_loader.dataset)
     return test_loss, mae
 
-
-
-def create_sliding_windows(data, sequence_length):
-    """
-    Create sliding windows of specified length from input data.
-    
-    Args:
-        data: Input data of shape (batch_size, seq_len, feature_dim)
-        sequence_length: Length of the subsequences to create
-        
-    Returns:
-        Array of shape (new_batch_size, sequence_length, feature_dim)
-    """
-    batch_size, seq_len, feature_dim = data.shape
-    if sequence_length >= seq_len:
-        return data  # No sliding needed if requested length is equal or longer
-    
-    # Number of sliding windows per original sequence
-    num_windows = seq_len - sequence_length + 1
-    
-    # Initialize output array
-    windowed_data = []
-    
-    # Create sliding windows
-    for i in range(batch_size):
-        for j in range(num_windows):
-            window = data[i, j:j+sequence_length, :]
-            windowed_data.append(window)
-    
-    # Stack along batch dimension
-    return np.stack(windowed_data, axis=0)
-
 # -------------------------------
 # Main execution flow with run directory
 # -------------------------------
@@ -239,6 +207,7 @@ def main(
     num_layers=5,
     fc_hidden_sizes=[512, 256, 128, 64, 32],
     sequence_length=30,  # Default to full length
+    use_sliding_window=False,
     train_loss_criteria=nn.MSELoss(),
     val_loss_criteria=nn.MSELoss(),
     run_name="price_prediction",
@@ -259,16 +228,38 @@ def main(
     print(f"  num_layers: {num_layers}")
     print(f"  fc_hidden_sizes: {fc_hidden_sizes}")
     print(f"  sequence_length: {sequence_length}")
+    print(f"  use_sliding_window: {use_sliding_window}")
 
     # Load and preprocess data
     data = get_data(sequence_length=sequence_length)
+    
+    print("Train data shape:", data["X_train_scaled"].shape)
+    print("Validation data shape:", data["X_val_scaled"].shape)
+    print("Test data shape:", data["X_test_scaled"].shape)
+    print(
+        f"Train data for sliding window: {data['X_train_sliding_window_scaled'].shape}"
+    )
+    print(
+        f"Validation data for sliding window: {data['X_val_sliding_window_scaled'].shape}"
+    )
+    print(f"Test data for sliding window: {data['X_test_sliding_window_scaled'].shape}")
 
-    X_train_scaled = data["X_train_scaled"]
-    y_train = data["y_train"]
-    X_val_scaled = data["X_val_scaled"]
-    y_val = data["y_val"]
-    X_test_scaled = data["X_test_scaled"]
-    y_test = data["y_test"]
+
+    if use_sliding_window:
+        X_train_scaled = data["X_train_sliding_window_scaled"]
+        y_train = data["y_train_sliding_window"]
+        X_val_scaled = data["X_val_sliding_window_scaled"]
+        y_val = data["y_val_sliding_window"]
+        X_test_scaled = data["X_test_sliding_window_scaled"]
+        y_test = data["y_test_sliding_window"]
+        
+    else:
+        X_train_scaled = data["X_train_scaled"]
+        y_train = data["y_train"]
+        X_val_scaled = data["X_val_scaled"]
+        y_val = data["y_val"]
+        X_test_scaled = data["X_test_scaled"]
+        y_test = data["y_test"]
     
     # Convert to PyTorch Tensors
     X_train_tensor = torch.tensor(X_train_scaled, dtype=torch.float32)
@@ -293,7 +284,7 @@ def main(
     print(f"input_size (number of features): {input_size}")
 
     # Train GRU Model
-    print("Training GRU model...")
+    print("Training Deep GRU model...")
     gru_model = GRUModelDeep(
         input_size=input_size, num_layers=num_layers, fc_hidden_sizes=fc_hidden_sizes
     )
@@ -316,7 +307,7 @@ def main(
     )
 
     # Train LSTM Model
-    print("\nTraining LSTM model...")
+    print("\nTraining Deep LSTM model...")
     lstm_model = LSTMModelDeep(
         input_size=input_size, num_layers=num_layers, fc_hidden_sizes=fc_hidden_sizes
     )
@@ -346,7 +337,8 @@ def main(
             "learning_rate": lr,
             "num_layers": num_layers,
             "fc_hidden_sizes": fc_hidden_sizes,
-            "sequence_length": sequence_length
+            "sequence_length": sequence_length,
+            "use_sliding_window": use_sliding_window,
         },
         "gru": {"best_val_loss": best_gru_val_loss, "best_val_mae": best_gru_val_mae},
         "lstm": {
@@ -369,9 +361,10 @@ if __name__ == "__main__":
     num_layers=5
     fc_hidden_sizes=[512, 256, 128, 64, 32]
     sequence_length=30
+    use_sliding_window=True
     train_loss_criteria=LogCoshLoss()
     val_loss_criteria=nn.MSELoss()
-    run_name = "LogCoshLoss_train_loss"
+    run_name = "DeepModels_SlidingWindow_LogCoshLossTrain_MSELossVal"
     
     main(
         batch_size=batch_size,
@@ -380,6 +373,7 @@ if __name__ == "__main__":
         num_layers=num_layers,
         fc_hidden_sizes=fc_hidden_sizes,
         sequence_length=sequence_length,
+        use_sliding_window=use_sliding_window,
         train_loss_criteria=train_loss_criteria,
         val_loss_criteria=val_loss_criteria,
         run_name=run_name,

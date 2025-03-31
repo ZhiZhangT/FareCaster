@@ -1,0 +1,42 @@
+Starting training run in directory: saved/DeepModels_SlidingWindow_LogCoshLossTrain_MSELossVal_20250331_145001
+Hyperparameters:
+  batch_size: 32
+  num_epochs: 50
+  learning rate: 0.005
+  num_layers: 5
+  fc_hidden_sizes: [512, 256, 128, 64, 32]
+  sequence_length: 30
+  use_sliding_window: True
+Loading preprocessed data and scaler from disk...
+Train data shape: (14381, 30, 14)
+Validation data shape: (1798, 30, 14)
+Test data shape: (1798, 30, 14)
+Train data for sliding window: (149568, 30, 14)
+Validation data for sliding window: (18334, 30, 14)
+Test data for sliding window: (18209, 30, 14)
+input_size (number of features): 14
+Training Deep GRU model...
+Training on device: mps
+Epoch 1/50, Train Loss: 105.6639, Val Loss: 99.7070
+Saved best model at epoch 1 with val loss 99.7070
+Time taken for epoch 1: 804.47s
+Epoch 2/50, Train Loss: 100.6397, Val Loss: 99.7985
+Time taken for epoch 2: 773.97s
+Epoch 3/50, Train Loss: 99.1809, Val Loss: 99.8377
+Time taken for epoch 3: 725.04s
+Epoch 4/50, Train Loss: 98.9850, Val Loss: 101.3481
+Time taken for epoch 4: 719.21s
+Epoch 5/50, Train Loss: 98.5882, Val Loss: 100.6616
+Time taken for epoch 5: 716.18s
+Epoch 6/50, Train Loss: 98.3225, Val Loss: 100.0185
+Time taken for epoch 6: 716.76s
+Epoch 7/50, Train Loss: 98.1286, Val Loss: 99.8673
+Time taken for epoch 7: 759.81s
+Epoch 8/50, Train Loss: 97.7764, Val Loss: 99.8122
+Time taken for epoch 8: 828.40s
+Epoch 9/50, Train Loss: 97.6050, Val Loss: 99.8515
+Time taken for epoch 9: 853.42s
+Epoch 10/50, Train Loss: 97.4947, Val Loss: 99.8967
+Time taken for epoch 10: 807.46s
+Epoch 11/50, Train Loss: 97.2368, Val Loss: 99.9635
+Time taken for epoch 11: 1102.20s
