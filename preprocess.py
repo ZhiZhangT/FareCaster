@@ -298,7 +298,9 @@ def preprocess_data(
 
     # Filter groups with at least sequence_length number of search dates
     filtered_groups = {
-        key: group for key, group in processed_groups.items() if len(group) >= sequence_length
+        key: group
+        for key, group in processed_groups.items()
+        if len(group) >= sequence_length
     }
 
     target_col = "totalFare"
@@ -408,26 +410,48 @@ def load_processed_data(data_filepath=constants.PROCESSED_DATA_FILE):
     return data
 
 
+def get_last_time_steps(data, time_steps):
+    """
+    Slices the second dimension of each data array to keep only the last {time_steps} time steps.
+    """
+    data_sliced = {}
+    for key, array in data.items():
+        # Ensure the array has at least two dimensions and enough time steps
+        if array.ndim >= 2 and array.shape[1] >= time_steps:
+            # Slicing the second dimension: keep the last x time steps
+            data_sliced[key] = array[:, -time_steps:, :]
+        else:
+            data_sliced[key] = array
+    return data_sliced
+
+
 # Main function to get data. It will load from cache if available unless forced to reprocess.
-def get_data(force_reprocess=False, sequence_length=30):
+def get_data(force_reprocess=False, sequence_length=30, time_steps=None):
     if (
         not force_reprocess
         and os.path.exists(constants.PROCESSED_DATA_FILE)
         and os.path.exists(constants.SCALER_FILE)
     ):
         print("Loading preprocessed data and scaler from disk...")
-        return load_processed_data()
+        data = load_processed_data()
     else:
         print("Processing raw data...")
         df = load_raw_data()
         data = preprocess_data(df, sequence_length)
         save_processed_data(data)
+
+    if time_steps is not None:
+        if time_steps > sequence_length:
+            raise Exception("time_steps must be <= sequence length.")
+        data_sliced = get_last_time_steps(data, time_steps)
+        return data_sliced
+    else:
         return data
 
 
 if __name__ == "__main__":
     # This will run the full pipeline only if cached files are missing.
-    data = get_data(force_reprocess=True)
+    data = get_data(force_reprocess=False, time_steps=7)
     print("Train data shape:", data["X_train_scaled"].shape)
     print("Validation data shape:", data["X_val_scaled"].shape)
     print("Test data shape:", data["X_test_scaled"].shape)
