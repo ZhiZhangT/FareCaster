@@ -1,0 +1,38 @@
+{
+    "hyperparameters": {
+        "batch_size": 32,
+        "num_epochs": 50,
+        "learning_rate": 0.005,
+        "num_layers": 5,
+        "fc_hidden_sizes": [
+            512,
+            256,
+            128,
+            64,
+            32
+        ],
+        "sequence_length": 30,
+        "use_sliding_window": true,
+        "transformer_hidden_size": 64,
+        "transformer_nhead": 4,
+        "transformer_dropout": 0.1
+    },
+    "gru": {
+        "best_val_loss": 29060.508452000893,
+        "best_val_mae": 100.48988526882049,
+        "test_loss": 27678.30359515246,
+        "test_mae": 101.62911156446906
+    },
+    "lstm": {
+        "best_val_loss": 18389.930854698323,
+        "best_val_mae": 70.77829894653334,
+        "test_loss": 16952.505922568795,
+        "test_mae": 71.7143948504871
+    },
+    "transformer": {
+        "best_val_loss": 29066.826567794553,
+        "best_val_mae": 100.49004549359604,
+        "test_loss": 27685.429954763025,
+        "test_mae": 101.63373128289845
+    }
+}
