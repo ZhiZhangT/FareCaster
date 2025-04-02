@@ -5,7 +5,7 @@ import time
 import os
 import sys
 from datetime import datetime
-from models import GRUModel, LSTMModel, GRUModelDeep, LSTMModelDeep
+from models import GRUModel, LSTMModel, GRUModelDeep, LSTMModelDeep, TransformerModel
 from torch.utils.data import TensorDataset, DataLoader
 from preprocess import get_data
 import matplotlib.pyplot as plt
@@ -211,6 +211,10 @@ def main(
     train_loss_criteria=nn.MSELoss(),
     val_loss_criteria=nn.MSELoss(),
     run_name="price_prediction",
+    # Transformer model parameters
+    transformer_hidden_size=64, 
+    transformer_nhead=4,
+    transformer_dropout=0.1,
 ):
     # Create run directory
     run_dir = create_run_directory(run_name)
@@ -229,6 +233,9 @@ def main(
     print(f"  fc_hidden_sizes: {fc_hidden_sizes}")
     print(f"  sequence_length: {sequence_length}")
     print(f"  use_sliding_window: {use_sliding_window}")
+    print(f"  transformer_hidden_size: {transformer_hidden_size}")
+    print(f"  transformer_nhead: {transformer_nhead}")
+    print(f"  transformer_dropout: {transformer_dropout}")
 
     # Load and preprocess data
     data = get_data(sequence_length=sequence_length)
@@ -329,6 +336,46 @@ def main(
         f"BEST LSTM Model Val Loss: {best_lstm_val_loss:.4f}, Val MAE: {best_lstm_val_mae:.4f}"
     )
 
+    # Train Transformer Model
+    print("\nTraining Transformer model...")
+    transformer_model = TransformerModel(
+        input_size=input_size, 
+        hidden_size=transformer_hidden_size, 
+        num_layers=min(3, num_layers),  # Transformers often need fewer layers
+        nhead=transformer_nhead,
+        dropout=transformer_dropout
+    )
+    transformer_model, transformer_losses = train_model(
+        transformer_model,
+        train_loader,
+        val_loader,
+        num_epochs=num_epochs,
+        lr=lr,
+        save_dir=run_dir,
+        model_type="transformer",
+        loss_criteria=train_loss_criteria,
+    )
+
+    plot_losses(transformer_losses, run_dir, "transformer")
+
+    best_transformer_val_loss, best_transformer_val_mae = evaluate_model(transformer_model, val_loader, val_loss_criteria)
+    print(
+        f"BEST Transformer Model Val Loss: {best_transformer_val_loss:.4f}, Val MAE: {best_transformer_val_mae:.4f}"
+    )
+
+    # Compare results of all models on test set
+    print("\nEvaluating all models on test set...")
+    
+    gru_test_loss, gru_test_mae = evaluate_model(gru_model, test_loader, val_loss_criteria)
+    print(f"GRU Model Test Loss: {gru_test_loss:.4f}, Test MAE: {gru_test_mae:.4f}")
+    
+    lstm_test_loss, lstm_test_mae = evaluate_model(lstm_model, test_loader, val_loss_criteria)
+    print(f"LSTM Model Test Loss: {lstm_test_loss:.4f}, Test MAE: {lstm_test_mae:.4f}")
+    
+    transformer_test_loss, transformer_test_mae = evaluate_model(transformer_model, test_loader, val_loss_criteria)
+    print(f"Transformer Model Test Loss: {transformer_test_loss:.4f}, Test MAE: {transformer_test_mae:.4f}")
+
+
     # Save experiment summary
     summary = {
         "hyperparameters": {
@@ -339,16 +386,46 @@ def main(
             "fc_hidden_sizes": fc_hidden_sizes,
             "sequence_length": sequence_length,
             "use_sliding_window": use_sliding_window,
+            "transformer_hidden_size": transformer_hidden_size,
+            "transformer_nhead": transformer_nhead,
+            "transformer_dropout": transformer_dropout
         },
-        "gru": {"best_val_loss": best_gru_val_loss, "best_val_mae": best_gru_val_mae},
+        "gru": {
+            "best_val_loss": best_gru_val_loss, 
+            "best_val_mae": best_gru_val_mae,
+            "test_loss": gru_test_loss,
+            "test_mae": gru_test_mae
+        },
         "lstm": {
             "best_val_loss": best_lstm_val_loss,
             "best_val_mae": best_lstm_val_mae,
+            "test_loss": lstm_test_loss,
+            "test_mae": lstm_test_mae
         },
+        "transformer": {
+            "best_val_loss": best_transformer_val_loss,
+            "best_val_mae": best_transformer_val_mae,
+            "test_loss": transformer_test_loss,
+            "test_mae": transformer_test_mae
+        }
     }
 
     with open(os.path.join(run_dir, "experiment_summary.json"), "w") as f:
         json.dump(summary, f, indent=4)
+
+    # Plot comparative bar chart for test MAE
+    plt.figure(figsize=(10, 6))
+    models = ['GRU', 'LSTM', 'Transformer']
+    mae_values = [gru_test_mae, lstm_test_mae, transformer_test_mae]
+    colors = ['blue', 'green', 'purple']
+    
+    plt.bar(models, mae_values, color=colors)
+    plt.title('Model Comparison: Test MAE')
+    plt.ylabel('Mean Absolute Error')
+    plt.grid(axis='y', linestyle='--', alpha=0.7)
+    
+    plt.savefig(os.path.join(run_dir, "model_comparison.png"))
+    plt.close()
 
     # Close the logger
     sys.stdout.close()
@@ -365,6 +442,10 @@ if __name__ == "__main__":
     train_loss_criteria=LogCoshLoss()
     val_loss_criteria=nn.MSELoss()
     run_name = "DeepModels_SlidingWindow_LogCoshLossTrain_MSELossVal"
+    # Transformer specific parameters
+    transformer_hidden_size = 64
+    transformer_nhead = 4
+    transformer_dropout = 0.1
     
     main(
         batch_size=batch_size,
@@ -377,4 +458,7 @@ if __name__ == "__main__":
         train_loss_criteria=train_loss_criteria,
         val_loss_criteria=val_loss_criteria,
         run_name=run_name,
+        transformer_hidden_size=transformer_hidden_size,
+        transformer_nhead=transformer_nhead,
+        transformer_dropout=transformer_dropout
     )
