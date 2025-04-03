@@ -388,20 +388,14 @@ def main(
         "gru": {
             "best_val_loss": best_gru_val_loss,
             "best_val_mae": best_gru_val_mae,
-            "test_loss": gru_test_loss,
-            "test_mae": gru_test_mae,
         },
         "lstm": {
             "best_val_loss": best_lstm_val_loss,
             "best_val_mae": best_lstm_val_mae,
-            "test_loss": lstm_test_loss,
-            "test_mae": lstm_test_mae,
         },
         "transformer": {
             "best_val_loss": best_transformer_val_loss,
             "best_val_mae": best_transformer_val_mae,
-            "test_loss": transformer_test_loss,
-            "test_mae": transformer_test_mae,
         },
     }
 
@@ -411,7 +405,7 @@ def main(
     # Plot comparative bar chart for test MAE
     plt.figure(figsize=(10, 6))
     models = ["GRU", "LSTM", "Transformer"]
-    mae_values = [gru_test_mae, lstm_test_mae, transformer_test_mae]
+    mae_values = [best_gru_val_mae, best_lstm_val_mae, best_transformer_val_mae]
     colors = ["blue", "green", "purple"]
 
     plt.bar(models, mae_values, color=colors)
