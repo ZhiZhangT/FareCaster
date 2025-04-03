@@ -38,19 +38,20 @@ class Logger:
 
     def close(self):
         self.log_file.close()
-        
+
+
 def log_cosh_loss(y_pred: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
     def _log_cosh(x: torch.Tensor) -> torch.Tensor:
-        return x + torch.nn.functional.softplus(-2. * x) - math.log(2.0)
+        return x + torch.nn.functional.softplus(-2.0 * x) - math.log(2.0)
+
     return torch.mean(_log_cosh(y_pred - y_true))
+
 
 class LogCoshLoss(torch.nn.Module):
     def __init__(self):
         super().__init__()
 
-    def forward(
-        self, y_pred: torch.Tensor, y_true: torch.Tensor
-    ) -> torch.Tensor:
+    def forward(self, y_pred: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
         return log_cosh_loss(y_pred, y_true)
 
 
@@ -196,9 +197,11 @@ def evaluate_model(model, test_loader, loss_criteria):
     mae = total_abs_error / len(test_loader.dataset)
     return test_loss, mae
 
+
 # -------------------------------
 # Main execution flow with run directory
 # -------------------------------
+
 
 def main(
     batch_size=32,
@@ -212,7 +215,7 @@ def main(
     val_loss_criteria=nn.MSELoss(),
     run_name="price_prediction",
     # Transformer model parameters
-    transformer_hidden_size=64, 
+    transformer_hidden_size=64,
     transformer_nhead=4,
     transformer_dropout=0.1,
 ):
@@ -223,7 +226,7 @@ def main(
     sys.stdout = Logger(os.path.join(run_dir, "training_log.txt"))
 
     print(f"Starting training run in directory: {run_dir}")
-    
+
     # Log hyperparameters
     print(f"Hyperparameters:")
     print(f"  batch_size: {batch_size}")
@@ -239,7 +242,7 @@ def main(
 
     # Load and preprocess data
     data = get_data(sequence_length=sequence_length)
-    
+
     print("Train data shape:", data["X_train_scaled"].shape)
     print("Validation data shape:", data["X_val_scaled"].shape)
     print("Test data shape:", data["X_test_scaled"].shape)
@@ -251,7 +254,6 @@ def main(
     )
     print(f"Test data for sliding window: {data['X_test_sliding_window_scaled'].shape}")
 
-
     if use_sliding_window:
         X_train_scaled = data["X_train_sliding_window_scaled"]
         y_train = data["y_train_sliding_window"]
@@ -259,7 +261,7 @@ def main(
         y_val = data["y_val_sliding_window"]
         X_test_scaled = data["X_test_sliding_window_scaled"]
         y_test = data["y_test_sliding_window"]
-        
+
     else:
         X_train_scaled = data["X_train_scaled"]
         y_train = data["y_train"]
@@ -267,7 +269,7 @@ def main(
         y_val = data["y_val"]
         X_test_scaled = data["X_test_scaled"]
         y_test = data["y_test"]
-    
+
     # Convert to PyTorch Tensors
     X_train_tensor = torch.tensor(X_train_scaled, dtype=torch.float32)
     y_train_tensor = torch.tensor(y_train, dtype=torch.float32).unsqueeze(1)
@@ -308,7 +310,9 @@ def main(
 
     plot_losses(gru_losses, run_dir, "gru")
 
-    best_gru_val_loss, best_gru_val_mae = evaluate_model(gru_model, val_loader, val_loss_criteria)
+    best_gru_val_loss, best_gru_val_mae = evaluate_model(
+        gru_model, val_loader, val_loss_criteria
+    )
     print(
         f"BEST GRU Model Val Loss: {best_gru_val_loss:.4f}, Val MAE: {best_gru_val_mae:.4f}"
     )
@@ -331,7 +335,9 @@ def main(
 
     plot_losses(lstm_losses, run_dir, "lstm")
 
-    best_lstm_val_loss, best_lstm_val_mae = evaluate_model(lstm_model, val_loader, val_loss_criteria)
+    best_lstm_val_loss, best_lstm_val_mae = evaluate_model(
+        lstm_model, val_loader, val_loss_criteria
+    )
     print(
         f"BEST LSTM Model Val Loss: {best_lstm_val_loss:.4f}, Val MAE: {best_lstm_val_mae:.4f}"
     )
@@ -339,11 +345,11 @@ def main(
     # Train Transformer Model
     print("\nTraining Transformer model...")
     transformer_model = TransformerModel(
-        input_size=input_size, 
-        hidden_size=transformer_hidden_size, 
+        input_size=input_size,
+        hidden_size=transformer_hidden_size,
         num_layers=min(3, num_layers),  # Transformers often need fewer layers
         nhead=transformer_nhead,
-        dropout=transformer_dropout
+        dropout=transformer_dropout,
     )
     transformer_model, transformer_losses = train_model(
         transformer_model,
@@ -358,23 +364,12 @@ def main(
 
     plot_losses(transformer_losses, run_dir, "transformer")
 
-    best_transformer_val_loss, best_transformer_val_mae = evaluate_model(transformer_model, val_loader, val_loss_criteria)
+    best_transformer_val_loss, best_transformer_val_mae = evaluate_model(
+        transformer_model, val_loader, val_loss_criteria
+    )
     print(
         f"BEST Transformer Model Val Loss: {best_transformer_val_loss:.4f}, Val MAE: {best_transformer_val_mae:.4f}"
     )
-
-    # Compare results of all models on test set
-    print("\nEvaluating all models on test set...")
-    
-    gru_test_loss, gru_test_mae = evaluate_model(gru_model, test_loader, val_loss_criteria)
-    print(f"GRU Model Test Loss: {gru_test_loss:.4f}, Test MAE: {gru_test_mae:.4f}")
-    
-    lstm_test_loss, lstm_test_mae = evaluate_model(lstm_model, test_loader, val_loss_criteria)
-    print(f"LSTM Model Test Loss: {lstm_test_loss:.4f}, Test MAE: {lstm_test_mae:.4f}")
-    
-    transformer_test_loss, transformer_test_mae = evaluate_model(transformer_model, test_loader, val_loss_criteria)
-    print(f"Transformer Model Test Loss: {transformer_test_loss:.4f}, Test MAE: {transformer_test_mae:.4f}")
-
 
     # Save experiment summary
     summary = {
@@ -388,26 +383,26 @@ def main(
             "use_sliding_window": use_sliding_window,
             "transformer_hidden_size": transformer_hidden_size,
             "transformer_nhead": transformer_nhead,
-            "transformer_dropout": transformer_dropout
+            "transformer_dropout": transformer_dropout,
         },
         "gru": {
-            "best_val_loss": best_gru_val_loss, 
+            "best_val_loss": best_gru_val_loss,
             "best_val_mae": best_gru_val_mae,
             "test_loss": gru_test_loss,
-            "test_mae": gru_test_mae
+            "test_mae": gru_test_mae,
         },
         "lstm": {
             "best_val_loss": best_lstm_val_loss,
             "best_val_mae": best_lstm_val_mae,
             "test_loss": lstm_test_loss,
-            "test_mae": lstm_test_mae
+            "test_mae": lstm_test_mae,
         },
         "transformer": {
             "best_val_loss": best_transformer_val_loss,
             "best_val_mae": best_transformer_val_mae,
             "test_loss": transformer_test_loss,
-            "test_mae": transformer_test_mae
-        }
+            "test_mae": transformer_test_mae,
+        },
     }
 
     with open(os.path.join(run_dir, "experiment_summary.json"), "w") as f:
@@ -415,15 +410,15 @@ def main(
 
     # Plot comparative bar chart for test MAE
     plt.figure(figsize=(10, 6))
-    models = ['GRU', 'LSTM', 'Transformer']
+    models = ["GRU", "LSTM", "Transformer"]
     mae_values = [gru_test_mae, lstm_test_mae, transformer_test_mae]
-    colors = ['blue', 'green', 'purple']
-    
+    colors = ["blue", "green", "purple"]
+
     plt.bar(models, mae_values, color=colors)
-    plt.title('Model Comparison: Test MAE')
-    plt.ylabel('Mean Absolute Error')
-    plt.grid(axis='y', linestyle='--', alpha=0.7)
-    
+    plt.title("Model Comparison: Test MAE")
+    plt.ylabel("Mean Absolute Error")
+    plt.grid(axis="y", linestyle="--", alpha=0.7)
+
     plt.savefig(os.path.join(run_dir, "model_comparison.png"))
     plt.close()
 
@@ -431,22 +426,23 @@ def main(
     sys.stdout.close()
     sys.stdout = sys.__stdout__
 
+
 if __name__ == "__main__":
-    batch_size=32
-    num_epochs=50
-    lr=0.005
-    num_layers=5
-    fc_hidden_sizes=[512, 256, 128, 64, 32]
-    sequence_length=30
-    use_sliding_window=True
-    train_loss_criteria=LogCoshLoss()
-    val_loss_criteria=nn.MSELoss()
+    batch_size = 32
+    num_epochs = 50
+    lr = 0.005
+    num_layers = 5
+    fc_hidden_sizes = [512, 256, 128, 64, 32]
+    sequence_length = 30
+    use_sliding_window = True
+    train_loss_criteria = LogCoshLoss()
+    val_loss_criteria = nn.MSELoss()
     run_name = "DeepModels_SlidingWindow_LogCoshLossTrain_MSELossVal"
     # Transformer specific parameters
     transformer_hidden_size = 64
     transformer_nhead = 4
     transformer_dropout = 0.1
-    
+
     main(
         batch_size=batch_size,
         num_epochs=num_epochs,
@@ -460,5 +456,5 @@ if __name__ == "__main__":
         run_name=run_name,
         transformer_hidden_size=transformer_hidden_size,
         transformer_nhead=transformer_nhead,
-        transformer_dropout=transformer_dropout
+        transformer_dropout=transformer_dropout,
     )
