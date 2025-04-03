@@ -204,21 +204,124 @@ def evaluate_model(model, test_loader, loss_criteria):
 
 
 def main(
-    batch_size=32,
-    num_epochs=50,
-    lr=0.005,
-    num_layers=5,
-    fc_hidden_sizes=[512, 256, 128, 64, 32],
-    sequence_length=30,  # Default to full length
-    use_sliding_window=False,
-    train_loss_criteria=nn.MSELoss(),
-    val_loss_criteria=nn.MSELoss(),
-    run_name="price_prediction",
-    # Transformer model parameters
-    transformer_hidden_size=64,
-    transformer_nhead=4,
-    transformer_dropout=0.1,
+    models,
+    summary,
+    use_sliding_window,
+    sequence_length,
+    batch_size,
+    num_epochs,
+    lr,
+    train_loss_criteria,
+    val_loss_criteria,
 ):
+    if "hyperparameters" not in summary:
+        raise ValueError("Summary must contain 'hyperparameters' key.")
+    if "common" not in summary["hyperparameters"]:
+        raise ValueError("Summary['hyperparameters'] must contain 'common' key.")
+
+    # Load and preprocess data
+    data = get_data(sequence_length=sequence_length)
+
+    if use_sliding_window:
+        X_train_scaled = data["X_train_sliding_window_scaled"]
+        y_train = data["y_train_sliding_window"]
+        X_val_scaled = data["X_val_sliding_window_scaled"]
+        y_val = data["y_val_sliding_window"]
+    else:
+        X_train_scaled = data["X_train_scaled"]
+        y_train = data["y_train"]
+        X_val_scaled = data["X_val_scaled"]
+        y_val = data["y_val"]
+
+    print(f"Train data shape: {X_train_scaled.shape}, {y_train.shape}")
+    print(f"Validation data shape: {X_val_scaled.shape}, {y_val.shape}")
+
+    # Convert to PyTorch Tensors
+    X_train_tensor = torch.tensor(X_train_scaled, dtype=torch.float32)
+    y_train_tensor = torch.tensor(y_train, dtype=torch.float32).unsqueeze(1)
+
+    X_val_tensor = torch.tensor(X_val_scaled, dtype=torch.float32)
+    y_val_tensor = torch.tensor(y_val, dtype=torch.float32).unsqueeze(1)
+
+    # Create DataLoaders
+    train_dataset = TensorDataset(X_train_tensor, y_train_tensor)
+    val_dataset = TensorDataset(X_val_tensor, y_val_tensor)
+
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size)
+
+    input_size = X_train_scaled.shape[2]  # number of features
+    print(f"input_size (number of features): {input_size}")
+
+    results = {}
+    for model_name, model_info in models.items():
+        print(f"\nTraining {model_name} model...")
+        # initialise the model with custom parameters
+        # NOTE: this code is equivalent to gru_model = GRUModelDeep(input_size=input_size, ...); but it can work with any model in the models dict
+        model = model_info["class"](input_size=input_size, **model_info["params"])
+        model, losses = train_model(
+            model,
+            train_loader,
+            val_loader,
+            num_epochs=num_epochs,
+            lr=lr,
+            save_dir=run_dir,
+            model_type=model_name.lower(),
+            loss_criteria=train_loss_criteria,
+        )
+        plot_losses(losses, run_dir, model_name.lower())
+        best_val_loss, best_val_mae = evaluate_model(
+            model, val_loader, val_loss_criteria
+        )
+        print(
+            f"BEST {model_name} Model Val Loss: {best_val_loss:.4f}, Val MAE: {best_val_mae:.4f}"
+        )
+        results[model_name] = {
+            "best_val_loss": best_val_loss,
+            "best_val_mae": best_val_mae,
+        }
+
+    # save experiment results on validation set
+    summary["results"] = results
+
+    # save model-specific hyperparameters
+    for model_name, model_info in models.items():
+        summary["hyperparameters"][model_name] = model_info["params"]
+
+    with open(os.path.join(run_dir, "experiment_summary.json"), "w") as f:
+        json.dump(summary, f, indent=4)
+
+    # Plot comparative bar chart for val MAE
+    plt.figure(figsize=(10, 6))
+    model_names = list(results.keys())
+    mae_values = [results[m]["best_val_mae"] for m in model_names]
+    # Use a subset of colors based on the number of models
+    colors = ["blue", "green", "purple"][: len(model_names)]
+    plt.bar(model_names, mae_values, color=colors)
+    plt.title("Model Comparison: Val MAE")
+    plt.ylabel("Mean Absolute Error")
+    plt.grid(axis="y", linestyle="--", alpha=0.7)
+
+    plt.savefig(os.path.join(run_dir, "model_comparison.png"))
+    plt.close()
+
+
+if __name__ == "__main__":
+    batch_size = 32
+    num_epochs = 50
+    lr = 0.005
+    num_layers = 5
+    fc_hidden_sizes = [512, 256, 128, 64, 32]
+    sequence_length = 30
+    use_sliding_window = True
+    train_loss_criteria = nn.MSELoss()
+    val_loss_criteria = nn.MSELoss()
+    run_name = "DeepModels_SlidingWindow_LogCoshLossTrain_MSELossVal"
+    # Transformer specific parameters
+    transformer_hidden_size = 64
+    transformer_nhead = 4
+    transformer_dropout = 0.1
+
     # Create run directory
     run_dir = create_run_directory(run_name)
 
@@ -228,7 +331,7 @@ def main(
     print(f"Starting training run in directory: {run_dir}")
 
     # Log hyperparameters
-    print(f"Hyperparameters:")
+    print("Hyperparameters:")
     print(f"  batch_size: {batch_size}")
     print(f"  num_epochs: {num_epochs}")
     print(f"  learning rate: {lr}")
@@ -240,215 +343,60 @@ def main(
     print(f"  transformer_nhead: {transformer_nhead}")
     print(f"  transformer_dropout: {transformer_dropout}")
 
-    # Load and preprocess data
-    data = get_data(sequence_length=sequence_length)
-
-    print("Train data shape:", data["X_train_scaled"].shape)
-    print("Validation data shape:", data["X_val_scaled"].shape)
-    print("Test data shape:", data["X_test_scaled"].shape)
-    print(
-        f"Train data for sliding window: {data['X_train_sliding_window_scaled'].shape}"
-    )
-    print(
-        f"Validation data for sliding window: {data['X_val_sliding_window_scaled'].shape}"
-    )
-    print(f"Test data for sliding window: {data['X_test_sliding_window_scaled'].shape}")
-
-    if use_sliding_window:
-        X_train_scaled = data["X_train_sliding_window_scaled"]
-        y_train = data["y_train_sliding_window"]
-        X_val_scaled = data["X_val_sliding_window_scaled"]
-        y_val = data["y_val_sliding_window"]
-        X_test_scaled = data["X_test_sliding_window_scaled"]
-        y_test = data["y_test_sliding_window"]
-
-    else:
-        X_train_scaled = data["X_train_scaled"]
-        y_train = data["y_train"]
-        X_val_scaled = data["X_val_scaled"]
-        y_val = data["y_val"]
-        X_test_scaled = data["X_test_scaled"]
-        y_test = data["y_test"]
-
-    # Convert to PyTorch Tensors
-    X_train_tensor = torch.tensor(X_train_scaled, dtype=torch.float32)
-    y_train_tensor = torch.tensor(y_train, dtype=torch.float32).unsqueeze(1)
-
-    X_val_tensor = torch.tensor(X_val_scaled, dtype=torch.float32)
-    y_val_tensor = torch.tensor(y_val, dtype=torch.float32).unsqueeze(1)
-
-    X_test_tensor = torch.tensor(X_test_scaled, dtype=torch.float32)
-    y_test_tensor = torch.tensor(y_test, dtype=torch.float32).unsqueeze(1)
-
-    # Create DataLoaders
-    train_dataset = TensorDataset(X_train_tensor, y_train_tensor)
-    val_dataset = TensorDataset(X_val_tensor, y_val_tensor)
-    test_dataset = TensorDataset(X_test_tensor, y_test_tensor)
-
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size)
-
-    input_size = X_train_scaled.shape[2]  # number of features
-    print(f"input_size (number of features): {input_size}")
-
-    # Train GRU Model
-    print("Training Deep GRU model...")
-    gru_model = GRUModelDeep(
-        input_size=input_size, num_layers=num_layers, fc_hidden_sizes=fc_hidden_sizes
-    )
-    gru_model, gru_losses = train_model(
-        gru_model,
-        train_loader,
-        val_loader,
-        num_epochs=num_epochs,
-        lr=lr,
-        save_dir=run_dir,
-        model_type="gru",
-        loss_criteria=train_loss_criteria,
-    )
-
-    plot_losses(gru_losses, run_dir, "gru")
-
-    best_gru_val_loss, best_gru_val_mae = evaluate_model(
-        gru_model, val_loader, val_loss_criteria
-    )
-    print(
-        f"BEST GRU Model Val Loss: {best_gru_val_loss:.4f}, Val MAE: {best_gru_val_mae:.4f}"
-    )
-
-    # Train LSTM Model
-    print("\nTraining Deep LSTM model...")
-    lstm_model = LSTMModelDeep(
-        input_size=input_size, num_layers=num_layers, fc_hidden_sizes=fc_hidden_sizes
-    )
-    lstm_model, lstm_losses = train_model(
-        lstm_model,
-        train_loader,
-        val_loader,
-        num_epochs=num_epochs,
-        lr=lr,
-        save_dir=run_dir,
-        model_type="lstm",
-        loss_criteria=train_loss_criteria,
-    )
-
-    plot_losses(lstm_losses, run_dir, "lstm")
-
-    best_lstm_val_loss, best_lstm_val_mae = evaluate_model(
-        lstm_model, val_loader, val_loss_criteria
-    )
-    print(
-        f"BEST LSTM Model Val Loss: {best_lstm_val_loss:.4f}, Val MAE: {best_lstm_val_mae:.4f}"
-    )
-
-    # Train Transformer Model
-    print("\nTraining Transformer model...")
-    transformer_model = TransformerModel(
-        input_size=input_size,
-        hidden_size=transformer_hidden_size,
-        num_layers=min(3, num_layers),  # Transformers often need fewer layers
-        nhead=transformer_nhead,
-        dropout=transformer_dropout,
-    )
-    transformer_model, transformer_losses = train_model(
-        transformer_model,
-        train_loader,
-        val_loader,
-        num_epochs=num_epochs,
-        lr=lr,
-        save_dir=run_dir,
-        model_type="transformer",
-        loss_criteria=train_loss_criteria,
-    )
-
-    plot_losses(transformer_losses, run_dir, "transformer")
-
-    best_transformer_val_loss, best_transformer_val_mae = evaluate_model(
-        transformer_model, val_loader, val_loss_criteria
-    )
-    print(
-        f"BEST Transformer Model Val Loss: {best_transformer_val_loss:.4f}, Val MAE: {best_transformer_val_mae:.4f}"
-    )
-
-    # Save experiment summary
+    # save common hyperparameters
     summary = {
         "hyperparameters": {
-            "batch_size": batch_size,
-            "num_epochs": num_epochs,
-            "learning_rate": lr,
-            "num_layers": num_layers,
-            "fc_hidden_sizes": fc_hidden_sizes,
-            "sequence_length": sequence_length,
-            "use_sliding_window": use_sliding_window,
-            "transformer_hidden_size": transformer_hidden_size,
-            "transformer_nhead": transformer_nhead,
-            "transformer_dropout": transformer_dropout,
+            "common": {
+                "batch_size": batch_size,
+                "num_epochs": num_epochs,
+                "learning_rate": lr,
+                "sequence_length": sequence_length,
+                "use_sliding_window": use_sliding_window,
+            },
+        }
+    }
+
+    # Dictionary for models and model-specific parameters
+    models = {
+        "GRU": {
+            "class": GRUModelDeep,
+            "params": {
+                "num_layers": num_layers,
+                "fc_hidden_sizes": fc_hidden_sizes,
+            },
         },
-        "gru": {
-            "best_val_loss": best_gru_val_loss,
-            "best_val_mae": best_gru_val_mae,
+        "LSTM": {
+            "class": LSTMModelDeep,
+            "params": {
+                "num_layers": num_layers,
+                "fc_hidden_sizes": fc_hidden_sizes,
+            },
         },
-        "lstm": {
-            "best_val_loss": best_lstm_val_loss,
-            "best_val_mae": best_lstm_val_mae,
-        },
-        "transformer": {
-            "best_val_loss": best_transformer_val_loss,
-            "best_val_mae": best_transformer_val_mae,
+        "Transformer": {
+            "class": TransformerModel,
+            "params": {
+                "hidden_size": transformer_hidden_size,
+                "num_layers": min(
+                    3, num_layers
+                ),  # Transformers often need fewer layers
+                "nhead": transformer_nhead,
+                "dropout": transformer_dropout,
+            },
         },
     }
 
-    with open(os.path.join(run_dir, "experiment_summary.json"), "w") as f:
-        json.dump(summary, f, indent=4)
-
-    # Plot comparative bar chart for test MAE
-    plt.figure(figsize=(10, 6))
-    models = ["GRU", "LSTM", "Transformer"]
-    mae_values = [best_gru_val_mae, best_lstm_val_mae, best_transformer_val_mae]
-    colors = ["blue", "green", "purple"]
-
-    plt.bar(models, mae_values, color=colors)
-    plt.title("Model Comparison: Test MAE")
-    plt.ylabel("Mean Absolute Error")
-    plt.grid(axis="y", linestyle="--", alpha=0.7)
-
-    plt.savefig(os.path.join(run_dir, "model_comparison.png"))
-    plt.close()
+    main(
+        models,
+        summary=summary,
+        use_sliding_window=use_sliding_window,
+        sequence_length=sequence_length,
+        batch_size=batch_size,
+        num_epochs=num_epochs,
+        lr=lr,
+        train_loss_criteria=train_loss_criteria,
+        val_loss_criteria=val_loss_criteria,
+    )
 
     # Close the logger
     sys.stdout.close()
     sys.stdout = sys.__stdout__
-
-
-if __name__ == "__main__":
-    batch_size = 32
-    num_epochs = 50
-    lr = 0.005
-    num_layers = 5
-    fc_hidden_sizes = [512, 256, 128, 64, 32]
-    sequence_length = 30
-    use_sliding_window = True
-    train_loss_criteria = LogCoshLoss()
-    val_loss_criteria = nn.MSELoss()
-    run_name = "DeepModels_SlidingWindow_LogCoshLossTrain_MSELossVal"
-    # Transformer specific parameters
-    transformer_hidden_size = 64
-    transformer_nhead = 4
-    transformer_dropout = 0.1
-
-    main(
-        batch_size=batch_size,
-        num_epochs=num_epochs,
-        lr=lr,
-        num_layers=num_layers,
-        fc_hidden_sizes=fc_hidden_sizes,
-        sequence_length=sequence_length,
-        use_sliding_window=use_sliding_window,
-        train_loss_criteria=train_loss_criteria,
-        val_loss_criteria=val_loss_criteria,
-        run_name=run_name,
-        transformer_hidden_size=transformer_hidden_size,
-        transformer_nhead=transformer_nhead,
-        transformer_dropout=transformer_dropout,
-    )
