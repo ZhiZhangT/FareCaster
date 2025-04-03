@@ -229,15 +229,20 @@ def cyclical_encode(X, feature_cols, cyclical_features):
 
 def get_last_window(group, seq_len, feature_cols, target_col):
     group = group.sort_values("searchDate").reset_index(drop=True)
+    # need to add +1 so that target_value can be the next value after the last window
+    # e.g. if seq_len = 30, then the last window is from data point 1 to 30, and the target value is at data point 31
+    seq_len += 1
     if len(group) < seq_len:
         return None, None
-    window = group.iloc[-seq_len:]
-    return window[feature_cols].values, window[target_col].values[-1]
+    window = group.iloc[-seq_len:-1]
+    target_value = group.iloc[-1][target_col]
+    return window[feature_cols].values, target_value
 
 
 def get_sliding_windows(group, seq_len, feature_cols, target_col):
     group = group.sort_values("searchDate").reset_index(drop=True)
     windows, targets = [], []
+    # NOTE: (len(group) <= seq_len) == (len(group) < seq_len + 1); hence, this condition is the same as the one in get_last_window
     if len(group) <= seq_len:
         return windows, targets
     # Create a sliding window for each possible position.
@@ -437,7 +442,7 @@ def get_data(force_reprocess=False, sequence_length=30, time_steps=None):
     else:
         print("Processing raw data...")
         df = load_raw_data()
-        data = preprocess_data(df, sequence_length)
+        data = preprocess_data(df, sequence_length=sequence_length)
         save_processed_data(data)
 
     if time_steps is not None:
@@ -451,7 +456,7 @@ def get_data(force_reprocess=False, sequence_length=30, time_steps=None):
 
 if __name__ == "__main__":
     # This will run the full pipeline only if cached files are missing.
-    data = get_data(force_reprocess=False, time_steps=7)
+    data = get_data(force_reprocess=False)
     print("Train data shape:", data["X_train_scaled"].shape)
     print("Validation data shape:", data["X_val_scaled"].shape)
     print("Test data shape:", data["X_test_scaled"].shape)
@@ -462,3 +467,4 @@ if __name__ == "__main__":
         f"Validation data for sliding window: {data['X_val_sliding_window_scaled'].shape}"
     )
     print(f"Test data for sliding window: {data['X_test_sliding_window_scaled'].shape}")
+    print(f"Train labels shape: {data['y_train'].shape}")
