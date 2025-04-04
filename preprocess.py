@@ -446,12 +446,8 @@ def get_last_time_steps(data, time_steps):
 
 # Main function to get data. It will load from cache if available unless forced to reprocess.
 def get_data(force_reprocess=False, sequence_length=30, time_steps=None):
-    if (
-        not force_reprocess
-        and os.path.exists(constants.PROCESSED_DATA_FILE)
-        and os.path.exists(constants.SCALER_FILE)
-    ):
-        print("Loading preprocessed data and scaler from disk...")
+    if not force_reprocess and os.path.exists(constants.PROCESSED_DATA_FILE):
+        print("Loading preprocessed data from disk...")
         data = load_processed_data()
     else:
         print("Processing raw data...")
@@ -473,7 +469,7 @@ def get_data(force_reprocess=False, sequence_length=30, time_steps=None):
 
 if __name__ == "__main__":
     # This will run the full pipeline only if cached files are missing.
-    data = get_data(force_reprocess=False, time_steps=10)
+    data = get_data(force_reprocess=False)
     print("Train data shape:", data["X_train_scaled"].shape)
     print("Validation data shape:", data["X_val_scaled"].shape)
     print("Test data shape:", data["X_test_scaled"].shape)
