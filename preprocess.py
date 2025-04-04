@@ -228,29 +228,38 @@ def cyclical_encode(X, feature_cols, cyclical_features):
 
 
 def get_last_window(group, seq_len, feature_cols, target_col):
+    if seq_len % 2 != 0:
+        raise ValueError("seq_len must be even.")
     group = group.sort_values("searchDate").reset_index(drop=True)
-    # need to add +1 so that target_value can be the next value after the last window
-    # e.g. if seq_len = 30, then the last window is from data point 1 to 30, and the target value is at data point 31
-    seq_len += 1
     if len(group) < seq_len:
         return None, None
-    window = group.iloc[-seq_len:-1]
-    target_value = group.iloc[-1][target_col]
-    return window[feature_cols].values, target_value
+    mid = seq_len // 2
+    # training_window = second last half of the group
+    training_window = group.iloc[-seq_len:-mid]
+    # target_window = last half of the group
+    target_window = group.iloc[-mid:]
+
+    return (
+        training_window[feature_cols].values,
+        target_window[target_col].values,
+    )
 
 
 def get_sliding_windows(group, seq_len, feature_cols, target_col):
+    if seq_len % 2 != 0:
+        raise ValueError("seq_len must be even.")
     group = group.sort_values("searchDate").reset_index(drop=True)
     windows, targets = [], []
-    # NOTE: (len(group) <= seq_len) == (len(group) < seq_len + 1); hence, this condition is the same as the one in get_last_window
-    if len(group) <= seq_len:
+    if len(group) < seq_len:
         return windows, targets
-    # Create a sliding window for each possible position.
-    for i in range(seq_len, len(group)):
+    mid = seq_len // 2
+    # NOTE: the "+1" is necessary to get the last window
+    for i in range(seq_len, len(group) + 1):
         # first group starts from index 0 to seq_len
-        window = group.iloc[i - seq_len : i]
-        windows.append(window[feature_cols].values)
-        targets.append(group.iloc[i][target_col])
+        training_window = group.iloc[i - seq_len : i - mid]
+        windows.append(training_window[feature_cols].values)
+        target_window = group.iloc[i - mid : i]
+        targets.append(target_window[target_col].values)
     return windows, targets
 
 
@@ -422,8 +431,14 @@ def get_last_time_steps(data, time_steps):
     for key, array in data.items():
         # Ensure the array has at least two dimensions and enough time steps
         if array.ndim >= 2 and array.shape[1] >= time_steps:
-            # Slicing the second dimension: keep the last x time steps
-            data_sliced[key] = array[:, -time_steps:, :]
+            # used for features (e.g. X_train)
+            if array.ndim == 3:
+                data_sliced[key] = array[:, -time_steps:, :]
+            # used for target (e.g. y_train)
+            elif array.ndim == 2:
+                data_sliced[key] = array[:, -time_steps:]
+            else:
+                raise ValueError(f"Unexpected array shape for key {key}: {array.shape}")
         else:
             data_sliced[key] = array
     return data_sliced
@@ -445,8 +460,11 @@ def get_data(force_reprocess=False, sequence_length=30, time_steps=None):
         save_processed_data(data)
 
     if time_steps is not None:
-        if time_steps > sequence_length:
-            raise Exception("time_steps must be <= sequence length.")
+        half_sequence_length = sequence_length // 2
+        if time_steps > half_sequence_length:
+            raise ValueError(
+                f"time_steps should be less than or equal to half of sequence_length ({half_sequence_length})."
+            )
         data_sliced = get_last_time_steps(data, time_steps)
         return data_sliced
     else:
@@ -455,7 +473,7 @@ def get_data(force_reprocess=False, sequence_length=30, time_steps=None):
 
 if __name__ == "__main__":
     # This will run the full pipeline only if cached files are missing.
-    data = get_data(force_reprocess=False)
+    data = get_data(force_reprocess=False, time_steps=10)
     print("Train data shape:", data["X_train_scaled"].shape)
     print("Validation data shape:", data["X_val_scaled"].shape)
     print("Test data shape:", data["X_test_scaled"].shape)
@@ -467,3 +485,14 @@ if __name__ == "__main__":
     )
     print(f"Test data for sliding window: {data['X_test_sliding_window_scaled'].shape}")
     print(f"Train labels shape: {data['y_train'].shape}")
+    print(f"Validation labels shape: {data['y_val'].shape}")
+    print(f"Test labels shape: {data['y_test'].shape}")
+    print(
+        f"Train labels for sliding window shape: {data['y_train_sliding_window'].shape}"
+    )
+    print(
+        f"Validation labels for sliding window shape: {data['y_val_sliding_window'].shape}"
+    )
+    print(
+        f"Test labels for sliding window shape: {data['y_test_sliding_window'].shape}"
+    )
