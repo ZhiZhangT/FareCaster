@@ -84,6 +84,7 @@ def train_model(
     val_loader,
     num_epochs=10,
     lr=0.001,
+    decay = 0.0,
     save_dir=None,
     model_type="model",
     loss_criteria=nn.MSELoss(),
@@ -99,7 +100,7 @@ def train_model(
     model.to(device)
 
     criterion = loss_criteria
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr, decay=decay)
 
     best_val_loss = float("inf")
     best_epoch = -1
@@ -313,19 +314,31 @@ def main(
     plt.savefig(os.path.join(run_dir, "model_comparison.png"))
     plt.close()
 
+    
+# {1: [[16], [32], [64], [128]],
+#  2: [[32, 16], [64, 32], [128, 64], [256, 128]],
+#  3: [[512, 256, 128], [256, 128, 64], [128, 64, 32], [64, 32, 16]]
+#  }
 
 if __name__ == "__main__":
-    batch_size = 32
-    num_epochs = 50
-    lr = 0.005
-    num_layers = 5
-    fc_hidden_sizes = [512, 256, 128, 64, 32]
-    sequence_length = 30
-    use_sliding_window = True
-    train_loss_criteria = nn.MSELoss()
-    val_loss_criteria = nn.MSELoss()
+    num_epochs=50
+    
+    batch_size=32 # [32, 64, 128, 256]
+    
+    lr=0.005 # [0.0005, 0.001, 0.05, 0.1]
+    num_layers=5 # [1, 3, 5]
+    fc_hidden_sizes=[512, 256, 128, 64, 32] # start with [4096, 2048, 1024, 512, 256]
+    
+    model_hidden_size=32 # [16, 32, 64, 128]
+    sequence_length=30 # [8, 15, 30]
+    
+    use_sliding_window=True
+    train_loss_criteria=nn.MSELoss()
+    val_loss_criteria=nn.MSELoss()
     run_name = "DeepModels_SlidingWindow_LogCoshLossTrain_MSELossVal"
+    
     # Transformer specific parameters
+    train_transformers = False
     transformer_hidden_size = 64
     transformer_nhead = 4
     transformer_dropout = 0.1

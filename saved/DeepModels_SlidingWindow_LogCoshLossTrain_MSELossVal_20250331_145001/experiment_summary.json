@@ -1,0 +1,25 @@
+{
+    "hyperparameters": {
+        "batch_size": 32,
+        "num_epochs": 50,
+        "learning_rate": 0.005,
+        "num_layers": 5,
+        "fc_hidden_sizes": [
+            512,
+            256,
+            128,
+            64,
+            32
+        ],
+        "sequence_length": 30,
+        "use_sliding_window": true
+    },
+    "gru": {
+        "best_val_loss": 29598.812378981675,
+        "best_val_mae": 100.39742809623152
+    },
+    "lstm": {
+        "best_val_loss": 25192.33528020856,
+        "best_val_mae": 90.93186469466629
+    }
+}
