@@ -258,7 +258,10 @@ def main(
         print(f"\nTraining {model_name} model...")
         # initialise the model with custom parameters
         # NOTE: this code is equivalent to gru_model = GRUModelDeep(input_size=input_size, ...); but it can work with any model in the models dict
-        model = model_info["class"](input_size=input_size, **model_info["params"])
+        # NOTE: since we are forecasting the same number of steps as the input sequence, output_size == input_size
+        model = model_info["class"](
+            input_size=input_size, output_size=input_size, **model_info["params"]
+        )
         model, losses = train_model(
             model,
             train_loader,

@@ -2,37 +2,39 @@ import torch.nn as nn
 import math
 import torch
 
-# GIVEN 176,000 samples, 5 input features, 1 output feature
-# technically, number of neurons should be in the range of (1465, 14665)
+# GIVEN 149,568 samples, 14 input features, 1 output feature
+# technically, number of neurons should be in the range of (499, 4985)
 
 
 # GRU-based model
 class GRUModel(nn.Module):
-    def __init__(self, input_size, hidden_size=32, num_layers=1):
+    def __init__(self, input_size, output_size, hidden_size=32, num_layers=1):
         super(GRUModel, self).__init__()
         self.gru = nn.GRU(input_size, hidden_size, num_layers, batch_first=True)
-        self.fc = nn.Linear(hidden_size, 1)  # Regression output
+        self.fc = nn.Linear(hidden_size, output_size)
 
     def forward(self, x):
         # x shape: (batch, seq_len, input_size)
         out, _ = self.gru(x)
         # Use the output of the last time step
-        out = out[:, -1, :]
-        out = self.fc(out)
+        out = out[:, -1, :]  # shape: (batch, hidden_size)
+        out = self.fc(out)  # shape: (batch, output_size)
+        out = out.unsqueeze(1)  # shape: (batch, 1, output_size)
         return out
 
 
 # LSTM-based model
 class LSTMModel(nn.Module):
-    def __init__(self, input_size, hidden_size=32, num_layers=1):
+    def __init__(self, input_size, output_size, hidden_size=32, num_layers=1):
         super(LSTMModel, self).__init__()
         self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
-        self.fc = nn.Linear(hidden_size, 1)
+        self.fc = nn.Linear(hidden_size, output_size)
 
     def forward(self, x):
         out, _ = self.lstm(x)
-        out = out[:, -1, :]
-        out = self.fc(out)
+        out = out[:, -1, :]  # shape: (batch, hidden_size)
+        out = self.fc(out)  # shape: (batch, output_size)
+        out = out.unsqueeze(1)  # shape: (batch, 1, output_size)
         return out
 
 
@@ -41,7 +43,12 @@ class LSTMModel(nn.Module):
 # -------------------------------
 class GRUModelDeep(nn.Module):
     def __init__(
-        self, input_size, hidden_size=32, num_layers=2, fc_hidden_sizes=[64, 32]
+        self,
+        input_size,
+        output_size,
+        hidden_size=32,
+        num_layers=2,
+        fc_hidden_sizes=[64, 32],
     ):
         """
         Args:
@@ -69,15 +76,16 @@ class GRUModelDeep(nn.Module):
             fc_layers.append(nn.Dropout(0.2))
             prev_size = hidden
         # Final output layer for regression
-        fc_layers.append(nn.Linear(prev_size, 1))
+        fc_layers.append(nn.Linear(prev_size, output_size))
         self.fc = nn.Sequential(*fc_layers)
 
     def forward(self, x):
         # x shape: (batch, seq_len, input_size)
         out, _ = self.gru(x)
         # Use the output of the last time step
-        out = out[:, -1, :]
-        out = self.fc(out)
+        out = out[:, -1, :]  # shape: (batch, hidden_size)
+        out = self.fc(out)  # shape: (batch, output_size)
+        out = out.unsqueeze(1)  # shape: (batch, 1, output_size)
         return out
 
 
@@ -86,7 +94,12 @@ class GRUModelDeep(nn.Module):
 # -------------------------------
 class LSTMModelDeep(nn.Module):
     def __init__(
-        self, input_size, hidden_size=32, num_layers=2, fc_hidden_sizes=[64, 32]
+        self,
+        input_size,
+        output_size,
+        hidden_size=32,
+        num_layers=2,
+        fc_hidden_sizes=[64, 32],
     ):
         """
         Args:
@@ -114,25 +127,35 @@ class LSTMModelDeep(nn.Module):
             fc_layers.append(nn.Dropout(0.2))
             prev_size = hidden
         # Final output layer for regression
-        fc_layers.append(nn.Linear(prev_size, 1))
+        fc_layers.append(nn.Linear(prev_size, output_size))
         self.fc = nn.Sequential(*fc_layers)
 
     def forward(self, x):
         # x shape: (batch, seq_len, input_size)
         out, _ = self.lstm(x)
         # Use the output of the last time step
-        out = out[:, -1, :]
-        out = self.fc(out)
+        out = out[:, -1, :]  # shape: (batch, hidden_size)
+        out = self.fc(out)  # shape: (batch, output_size)
+        out = out.unsqueeze(1)  # shape: (batch, 1, output_size)
         return out
+
 
 # -------------------------------
 # Transformer model
 # -------------------------------
 class TransformerModel(nn.Module):
-    def __init__(self, input_size, hidden_size=64, num_layers=2, nhead=4, dropout=0.1):
+    def __init__(
+        self,
+        input_size,
+        output_size,
+        hidden_size=64,
+        num_layers=2,
+        nhead=4,
+        dropout=0.1,
+    ):
         """
         TransformerModel for time series prediction.
-        
+
         Args:
             input_size: Number of input features
             hidden_size: Size of hidden dimension in transformer
@@ -141,62 +164,65 @@ class TransformerModel(nn.Module):
             dropout: Dropout probability
         """
         super(TransformerModel, self).__init__()
-        
+
         self.input_size = input_size
         self.hidden_size = hidden_size
-        
+
         # Position encoding
         self.pos_encoder = PositionalEncoding(hidden_size, dropout)
-        
+
         # Input projection
         self.input_projection = nn.Linear(input_size, hidden_size)
-        
+
         # Transformer encoder
         encoder_layers = nn.TransformerEncoderLayer(
             d_model=hidden_size,
             nhead=nhead,
             dim_feedforward=hidden_size * 4,
             dropout=dropout,
-            batch_first=True
+            batch_first=True,
         )
         self.transformer_encoder = nn.TransformerEncoder(
-            encoder_layers,
-            num_layers=num_layers
+            encoder_layers, num_layers=num_layers
         )
-        
+
         # Output layer
-        self.output_layer = nn.Linear(hidden_size, 1)
-        
+        self.output_layer = nn.Linear(hidden_size, output_size)
+
     def forward(self, x):
         """
         Args:
             x: Input tensor with shape (batch_size, sequence_length, input_size)
-            
+
         Returns:
             Output tensor with shape (batch_size, 1)
         """
         # Project input to hidden dimension
         x = self.input_projection(x)
-        
+
         # Add positional encoding
         x = self.pos_encoder(x)
-        
+
         # Apply transformer encoder
         x = self.transformer_encoder(x)
-        
+
         # Use the output from the last time step for prediction
         x = x[:, -1, :]
-        
+
         # Project to output dimension
         x = self.output_layer(x)
-        
+
+        # Reshape to (batch_size, 1, output_size)
+        x = x.unsqueeze(1)
+
         return x
+
 
 class PositionalEncoding(nn.Module):
     def __init__(self, d_model, dropout=0.1, max_len=5000):
         """
         Positional encoding for transformer model.
-        
+
         Args:
             d_model: Hidden dimension size
             dropout: Dropout probability
@@ -204,26 +230,28 @@ class PositionalEncoding(nn.Module):
         """
         super(PositionalEncoding, self).__init__()
         self.dropout = nn.Dropout(p=dropout)
-        
+
         # Create positional encoding matrix
         pe = torch.zeros(max_len, d_model)
         position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
-        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
-        
+        div_term = torch.exp(
+            torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model)
+        )
+
         pe[:, 0::2] = torch.sin(position * div_term)
         pe[:, 1::2] = torch.cos(position * div_term)
-        
+
         # Register buffer to be saved with model
         pe = pe.unsqueeze(0)
-        self.register_buffer('pe', pe)
-        
+        self.register_buffer("pe", pe)
+
     def forward(self, x):
         """
         Args:
             x: Input tensor with shape (batch_size, sequence_length, d_model)
-        
+
         Returns:
             Output with positional encoding added
         """
-        x = x + self.pe[:, :x.size(1), :]
+        x = x + self.pe[:, : x.size(1), :]
         return self.dropout(x)
