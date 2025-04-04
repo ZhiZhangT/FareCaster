@@ -279,6 +279,7 @@ def preprocess_data(
     feature_cols=constants.FEATURE_COLS,
     categorical_cols=constants.CATEGORICAL_COLS,
     cyclical_features=constants.CYCLICAL_FEATURES,
+    target_col=constants.TARGET_COL,
     sequence_length=30,
 ):
     # NOTE: these fields have to be added before group_routes_by_flight_date as they are used in the function
@@ -307,8 +308,6 @@ def preprocess_data(
         for key, group in processed_groups.items()
         if len(group) >= sequence_length
     }
-
-    target_col = "totalFare"
 
     # --- Split into train/test/validation first ---
 
