@@ -1,0 +1,51 @@
+{
+    "hyperparameters": {
+        "common": {
+            "batch_size": 32,
+            "num_epochs": 50,
+            "learning_rate": 0.005,
+            "sequence_length": 30,
+            "use_sliding_window": true
+        },
+        "GRU": {
+            "num_layers": 5,
+            "fc_hidden_sizes": [
+                512,
+                256,
+                128,
+                64,
+                32
+            ]
+        },
+        "LSTM": {
+            "num_layers": 5,
+            "fc_hidden_sizes": [
+                512,
+                256,
+                128,
+                64,
+                32
+            ]
+        },
+        "Transformer": {
+            "hidden_size": 64,
+            "num_layers": 3,
+            "nhead": 4,
+            "dropout": 0.1
+        }
+    },
+    "results": {
+        "GRU": {
+            "best_val_loss": 9708.884802297027,
+            "best_val_mae": 874.2752316643745
+        },
+        "LSTM": {
+            "best_val_loss": 9174.28110787164,
+            "best_val_mae": 836.5130690906811
+        },
+        "Transformer": {
+            "best_val_loss": 10115.729495292011,
+            "best_val_mae": 917.3973830822043
+        }
+    }
+}
