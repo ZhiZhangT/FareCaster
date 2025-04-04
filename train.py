@@ -185,16 +185,21 @@ def evaluate_model(model, test_loader, loss_criteria):
     criterion = loss_criteria
     test_loss = 0.0
     total_abs_error = 0.0
+    total_data_points = 0
     with torch.no_grad():
         for X_batch, y_batch in test_loader:
             X_batch = X_batch.to(device)
             y_batch = y_batch.to(device)
             predictions = model(X_batch)
             loss = criterion(predictions, y_batch)
+            # X_batch.size(0) = batch size
             test_loss += loss.item() * X_batch.size(0)
             total_abs_error += torch.sum(torch.abs(predictions - y_batch)).item()
+            total_data_points += y_batch.numel()
+    # len(test_loader.dataset) = number of samples in the dataset
+    # NOTE: we do not divide by total_data_points here because test_loss is already averaged over each sample's sequence length
     test_loss /= len(test_loader.dataset)
-    mae = total_abs_error / len(test_loader.dataset)
+    mae = total_abs_error / total_data_points
     return test_loss, mae
 
 
