@@ -100,7 +100,7 @@ def train_model(
     model.to(device)
 
     criterion = loss_criteria
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr, decay=decay)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
     best_val_loss = float("inf")
     best_epoch = -1
@@ -219,6 +219,7 @@ def main(
     lr,
     train_loss_criteria,
     val_loss_criteria,
+    
 ):
     if "hyperparameters" not in summary:
         raise ValueError("Summary must contain 'hyperparameters' key.")
@@ -339,9 +340,11 @@ if __name__ == "__main__":
     
     # Transformer specific parameters
     train_transformers = False
-    transformer_hidden_size = 64
-    transformer_nhead = 4
-    transformer_dropout = 0.1
+    transformer_hidden_size = 16 # [16, 32, 64, 128]
+    transformer_nhead = 1 # [1, 2, 4, 8]
+    transformer_dropout = 0.0 # [0.0, 0.1, 0.2, 0.3]
+    transformer_num_layers = 1 # [1, 2, 4, 6]
+    
 
     # Create run directory
     run_dir = create_run_directory(run_name)
@@ -363,6 +366,7 @@ if __name__ == "__main__":
     print(f"  transformer_hidden_size: {transformer_hidden_size}")
     print(f"  transformer_nhead: {transformer_nhead}")
     print(f"  transformer_dropout: {transformer_dropout}")
+    print(f"  transformer_num_layers: {transformer_num_layers}")
 
     # save common hyperparameters
     summary = {
@@ -379,27 +383,25 @@ if __name__ == "__main__":
 
     # Dictionary for models and model-specific parameters
     models = {
-        "GRU": {
-            "class": GRUModelDeep,
-            "params": {
-                "num_layers": num_layers,
-                "fc_hidden_sizes": fc_hidden_sizes,
-            },
-        },
-        "LSTM": {
-            "class": LSTMModelDeep,
-            "params": {
-                "num_layers": num_layers,
-                "fc_hidden_sizes": fc_hidden_sizes,
-            },
-        },
+        # "GRU": {
+        #     "class": GRUModelDeep,
+        #     "params": {
+        #         "num_layers": num_layers,
+        #         "fc_hidden_sizes": fc_hidden_sizes,
+        #     },
+        # },
+        # "LSTM": {
+        #     "class": LSTMModelDeep,
+        #     "params": {
+        #         "num_layers": num_layers,
+        #         "fc_hidden_sizes": fc_hidden_sizes,
+        #     },
+        # },
         "Transformer": {
             "class": TransformerModel,
             "params": {
                 "hidden_size": transformer_hidden_size,
-                "num_layers": min(
-                    3, num_layers
-                ),  # Transformers often need fewer layers
+                "num_layers": transformer_num_layers,  # Transformers often need fewer layers
                 "nhead": transformer_nhead,
                 "dropout": transformer_dropout,
             },
@@ -416,6 +418,10 @@ if __name__ == "__main__":
         lr=lr,
         train_loss_criteria=train_loss_criteria,
         val_loss_criteria=val_loss_criteria,
+        # transformer_hidden_size=transformer_hidden_size,
+        # transformer_nhead=transformer_nhead,
+        # transformer_dropout=transformer_dropout,
+        # transformer_num_layers=transformer_num_layers,
     )
 
     # Close the logger
