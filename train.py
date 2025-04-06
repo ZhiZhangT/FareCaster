@@ -383,20 +383,20 @@ if __name__ == "__main__":
 
     # Dictionary for models and model-specific parameters
     models = {
-        # "GRU": {
-        #     "class": GRUModelDeep,
-        #     "params": {
-        #         "num_layers": num_layers,
-        #         "fc_hidden_sizes": fc_hidden_sizes,
-        #     },
-        # },
-        # "LSTM": {
-        #     "class": LSTMModelDeep,
-        #     "params": {
-        #         "num_layers": num_layers,
-        #         "fc_hidden_sizes": fc_hidden_sizes,
-        #     },
-        # },
+        "GRU": {
+            "class": GRUModelDeep,
+            "params": {
+                "num_layers": num_layers,
+                "fc_hidden_sizes": fc_hidden_sizes,
+            },
+        },
+        "LSTM": {
+            "class": LSTMModelDeep,
+            "params": {
+                "num_layers": num_layers,
+                "fc_hidden_sizes": fc_hidden_sizes,
+            },
+        },
         "Transformer": {
             "class": TransformerModel,
             "params": {
@@ -418,10 +418,6 @@ if __name__ == "__main__":
         lr=lr,
         train_loss_criteria=train_loss_criteria,
         val_loss_criteria=val_loss_criteria,
-        # transformer_hidden_size=transformer_hidden_size,
-        # transformer_nhead=transformer_nhead,
-        # transformer_dropout=transformer_dropout,
-        # transformer_num_layers=transformer_num_layers,
     )
 
     # Close the logger
