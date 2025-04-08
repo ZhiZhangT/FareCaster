@@ -20,11 +20,26 @@ class Logger:
     def __init__(self, log_file):
         self.terminal = sys.stdout
         self.log_file = open(log_file, "w")
+        self._buffer = ""
 
     def write(self, message):
-        self.terminal.write(message)
-        self.log_file.write(message)
-        self.log_file.flush()
+        # Append new message to the buffer
+        self._buffer += message
+
+        # Process complete lines only
+        while "\n" in self._buffer:
+            # Split at the first newline
+            line, self._buffer = self._buffer.split("\n", 1)
+            line += "\n"  # Restore newline to the line
+
+            # Check if the line should be ignored
+            if "it/s" in line:
+                continue
+
+            # Write the line to the terminal and file
+            self.terminal.write(line)
+            self.log_file.write(line)
+            self.log_file.flush()
 
     def flush(self):
         self.terminal.flush()
