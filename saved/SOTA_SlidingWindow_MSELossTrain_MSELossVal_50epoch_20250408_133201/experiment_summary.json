@@ -1,0 +1,25 @@
+{
+    "hyperparameters": {
+        "common": {
+            "batch_size": 32,
+            "num_epochs": 50,
+            "learning_rate": 0.005,
+            "sequence_length": 15,
+            "use_sliding_window": true
+        }
+    },
+    "results": {
+        "LSTM": {
+            "best_val_loss": 42383.38671875,
+            "best_val_mae": 142.77615356445312
+        },
+        "NLinear": {
+            "best_val_loss": 35185.21484375,
+            "best_val_mae": 129.09249877929688
+        },
+        "DLinear": {
+            "best_val_loss": 31763.5546875,
+            "best_val_mae": 122.78593444824219
+        }
+    }
+}

@@ -1,0 +1,6 @@
+Shape of df: (4898100, 3)
+Shape of df_val: (306135, 3)
+Shape of Y_hat_df_val: (306135, 5)
+BEST LSTM Model Val Loss: 42383.3867, Val MAE: 142.7762
+BEST NLinear Model Val Loss: 35185.2148, Val MAE: 129.0925
+BEST DLinear Model Val Loss: 31763.5547, Val MAE: 122.7859

@@ -1,0 +1,29 @@
+{
+    "hyperparameters": {
+        "common": {
+            "batch_size": 32,
+            "num_epochs": 5,
+            "learning_rate": 0.005,
+            "sequence_length": 15,
+            "use_sliding_window": true
+        }
+    },
+    "results": {
+        "LSTM": {
+            "best_val_loss": 42806.64453125,
+            "best_val_mae": 144.28575134277344
+        },
+        "TimesNet": {
+            "best_val_loss": 47532.60546875,
+            "best_val_mae": 146.20712280273438
+        },
+        "NLinear": {
+            "best_val_loss": 35340.28515625,
+            "best_val_mae": 129.26708984375
+        },
+        "Autoformer": {
+            "best_val_loss": 33333.68359375,
+            "best_val_mae": 126.19359588623047
+        }
+    }
+}
