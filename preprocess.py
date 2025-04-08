@@ -184,15 +184,6 @@ def group_routes_by_flight_date(dataframe):
     return route_date_groups
 
 
-def parse_date(date_str):
-    for fmt in ("%d/%m/%y", "%Y-%m-%d"):
-        try:
-            return pd.to_datetime(date_str, format=fmt)
-        except ValueError:
-            continue
-    raise ValueError(f"No valid date format found for: {date_str}")
-
-
 # Wrap your raw data loading in a function.
 def load_raw_data(filepath=constants.RAW_DATA_PATH):
     return pd.read_csv(filepath)
