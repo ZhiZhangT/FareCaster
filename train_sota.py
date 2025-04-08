@@ -1,0 +1,190 @@
+import logging
+
+import pandas as pd
+
+from neuralforecast import NeuralForecast
+from neuralforecast.models import LSTM, TimesNet, Autoformer, NLinear, DLinear
+from neuralforecast.losses.pytorch import MAE, MSE
+
+import torch
+import random
+import constants
+import os
+import sys
+import matplotlib.pyplot as plt
+import json
+from utils.logging import create_run_directory, Logger, plot_losses
+
+
+if __name__ == "__main__":
+    # hyperparameters
+    # number of steps to predict
+    horizon = 15
+    batch_size = 32
+    num_epochs = 50
+    # number of batches to run before updating trainable parameters
+    val_check_steps = 5103
+    max_steps = val_check_steps * num_epochs  # 50 epochs * 5103 batches per epoch
+    lr = 0.005
+    train_loss_criteria = MSE()
+    val_loss_criteria = MSE()
+
+    # print required attributes of val_loss_criteria
+
+    train_loss_criteria_name = train_loss_criteria.__class__.__name__
+    val_loss_criteria_name = val_loss_criteria.__class__.__name__
+
+    run_name = f"SOTA_SlidingWindow_{train_loss_criteria_name}LossTrain_{val_loss_criteria_name}LossVal"
+
+    # Create run directory
+    run_dir = create_run_directory(run_name)
+
+    print(f"Starting training run in directory: {run_dir}")
+
+    # save common hyperparameters
+    summary = {
+        "hyperparameters": {
+            "common": {
+                "batch_size": batch_size,
+                "num_epochs": num_epochs,
+                "learning_rate": lr,
+                "sequence_length": horizon,
+                "use_sliding_window": True,  # only sliding window data is available
+            },
+        }
+    }
+
+    # Set up logging to capture all print statements
+    sys.stdout = Logger(os.path.join(run_dir, "training_log.txt"))
+
+    random.seed(constants.RANDOM_STATE)
+
+    df = pd.read_csv("saved/train.csv")
+    df_val_first = pd.read_csv("saved/validation_first.csv")
+    df_val_second = pd.read_csv("saved/validation_second.csv")
+
+    df["ds"] = pd.to_datetime(df["ds"])
+    df_val_first["ds"] = pd.to_datetime(df_val_first["ds"])
+    df_val_second["ds"] = pd.to_datetime(df_val_second["ds"])
+
+    print(f"Shape of df: {df.shape}")
+    print(f"Shape of df_val: {df_val_first.shape}")
+
+    models = [
+        LSTM(
+            h=horizon,
+            input_size=horizon,
+            batch_size=batch_size,
+            max_steps=max_steps,
+            val_check_steps=val_check_steps,
+            learning_rate=lr,
+            loss=train_loss_criteria,
+            random_seed=constants.RANDOM_STATE,
+        ),
+        TimesNet(
+            h=horizon,  # number of steps to predict
+            input_size=horizon,  # length of input sequence
+            batch_size=batch_size,
+            max_steps=max_steps,
+            val_check_steps=val_check_steps,
+            learning_rate=lr,
+            loss=train_loss_criteria,
+            hidden_size=32,
+            conv_hidden_size=32,
+            random_seed=constants.RANDOM_STATE,
+        ),
+        NLinear(
+            h=horizon,
+            input_size=horizon,
+            batch_size=batch_size,
+            max_steps=max_steps,
+            val_check_steps=val_check_steps,
+            learning_rate=lr,
+            loss=train_loss_criteria,
+            random_seed=constants.RANDOM_STATE,
+        ),
+        Autoformer(
+            h=horizon,
+            input_size=horizon,
+            batch_size=batch_size,
+            max_steps=max_steps,
+            val_check_steps=val_check_steps,
+            learning_rate=lr,
+            loss=train_loss_criteria,
+            random_seed=constants.RANDOM_STATE,
+        ),
+    ]
+
+    # TRAIN THE MODEL
+    nf = NeuralForecast(models=models, freq="D")
+    nf.fit(df=df)
+    nf.save(path=f"{run_dir}/nixtla")
+
+    # TEST MODEL ON VALIDATION SET
+    Y_hat_df_val = nf.predict(df=df_val_first)
+    print(f"Shape of Y_hat_df_val: {Y_hat_df_val.shape}")
+    # save the predictions to a CSV file
+    Y_hat_df_val.to_csv(f"{run_dir}/validation_predictions.csv", index=False)
+    ground_truth_tensor = torch.tensor(df_val_second["y"].values, dtype=torch.float32)
+
+    results = dict()
+    for model in nf.models:
+        model_name = model.__class__.__name__
+        train_losses = model.train_trajectories
+        # train_losses shape is [(epoch, loss)]
+        # get only the loss values
+        train_losses = [loss[1] for loss in train_losses]
+        valid_losses = nf.models[0].valid_trajectories
+        valid_losses = [loss[1] for loss in valid_losses]
+        plot_losses(
+            losses={
+                "train_losses": train_losses,
+                "val_losses": valid_losses,
+            },
+            save_dir=run_dir,
+            model_type=model_name,
+        )
+
+        predicted_tensor = torch.tensor(
+            Y_hat_df_val[model_name].values, dtype=torch.float32
+        )
+
+        # NOTE: both val_mae and val_loss are 1D tensors
+        val_mae = MAE()(y=ground_truth_tensor, y_hat=predicted_tensor)
+
+        val_loss = val_loss_criteria(
+            y=ground_truth_tensor,
+            y_hat=predicted_tensor,
+            y_insample=None,  # the y_insample seems to be a bug in the library because it is not used
+        )
+        print(
+            f"BEST {model_name} Model Val Loss: {val_loss:.4f}, Val MAE: {val_mae:.4f}"
+        )
+        results[model_name] = {
+            "best_val_loss": val_loss.item(),
+            "best_val_mae": val_mae.item(),
+        }
+
+    # save experiment results on validation set
+    summary["results"] = results
+
+    with open(os.path.join(run_dir, "experiment_summary.json"), "w") as f:
+        json.dump(summary, f, indent=4)
+
+    # Plot comparative bar chart for val MAE
+    plt.figure(figsize=(10, 6))
+    model_names = list(results.keys())
+    mae_values = [results[m]["best_val_mae"] for m in model_names]
+    # Use a subset of colors based on the number of models
+    colors = ["blue", "green", "purple", "red"][: len(model_names)]
+    plt.bar(model_names, mae_values, color=colors)
+    plt.title("Model Comparison: Val MAE")
+    plt.ylabel("Mean Absolute Error")
+    plt.grid(axis="y", linestyle="--", alpha=0.7)
+
+    plt.savefig(os.path.join(run_dir, "model_comparison.png"))
+    plt.close()
+
+    # Close the logger
+    sys.stdout.close()
+    sys.stdout = sys.__stdout__
