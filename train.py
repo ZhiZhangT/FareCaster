@@ -259,6 +259,8 @@ def main(
 
     input_size = X_train_scaled.shape[2]  # number of features
     print(f"input_size (number of features): {input_size}")
+    num_predictions = y_train.shape[1]  # number of predictions
+    print(f"num_predictions (number of predictions): {num_predictions}")
 
     results = {}
     for model_name, model_info in models.items():
@@ -267,7 +269,7 @@ def main(
         # NOTE: this code is equivalent to gru_model = GRUModelDeep(input_size=input_size, ...); but it can work with any model in the models dict
         # NOTE: since we are forecasting the same number of steps as the input sequence, output_size == input_size
         model = model_info["class"](
-            input_size=input_size, output_size=input_size, **model_info["params"]
+            input_size=input_size, output_size=num_predictions, **model_info["params"]
         )
         model, losses = train_model(
             model,
