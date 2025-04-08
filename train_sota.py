@@ -24,12 +24,11 @@ if __name__ == "__main__":
     num_epochs = 50
     # number of batches to run before updating trainable parameters
     val_check_steps = 5103
-    max_steps = val_check_steps * num_epochs  # 50 epochs * 5103 batches per epoch
+    # max_steps == number of batches per epoch * number of epochs
+    max_steps = val_check_steps * num_epochs
     lr = 0.005
     train_loss_criteria = MSE()
     val_loss_criteria = MSE()
-
-    # print required attributes of val_loss_criteria
 
     train_loss_criteria_name = train_loss_criteria.__class__.__name__
     val_loss_criteria_name = val_loss_criteria.__class__.__name__
