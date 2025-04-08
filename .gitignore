@@ -174,3 +174,10 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 saved/preprocessed_data.pkl
+
+
+# big/redundant SOTA model logs
+validation_predictions.csv
+configuration.pkl
+dataset.pkl
+alias_to_model.pkl
