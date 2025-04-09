@@ -1,9 +1,15 @@
-import logging
-
 import pandas as pd
 
 from neuralforecast import NeuralForecast
-from neuralforecast.models import LSTM, TimesNet, Autoformer, NLinear, DLinear
+from neuralforecast.models import (
+    LSTM,
+    TimesNet,
+    Autoformer,
+    NLinear,
+    DLinear,
+    NBEATS,
+    NHITS,
+)
 from neuralforecast.losses.pytorch import MAE, MSE
 
 import torch
@@ -21,7 +27,7 @@ if __name__ == "__main__":
     # number of steps to predict
     horizon = 15
     batch_size = 32
-    num_epochs = 50
+    num_epochs = 0.02
     # number of batches to run before updating trainable parameters
     val_check_steps = 5103
     # max_steps == number of batches per epoch * number of epochs
@@ -70,7 +76,57 @@ if __name__ == "__main__":
     print(f"Shape of df_val: {df_val_first.shape}")
 
     models = [
+        NBEATS(
+            h=horizon,
+            input_size=horizon,
+            batch_size=batch_size,
+            max_steps=max_steps,
+            val_check_steps=val_check_steps,
+            learning_rate=lr,
+            loss=train_loss_criteria,
+            random_seed=constants.RANDOM_STATE,
+        ),
+        NHITS(
+            h=horizon,
+            input_size=horizon,
+            batch_size=batch_size,
+            max_steps=max_steps,
+            val_check_steps=val_check_steps,
+            learning_rate=lr,
+            loss=train_loss_criteria,
+            random_seed=constants.RANDOM_STATE,
+        ),
         LSTM(
+            h=horizon,
+            input_size=horizon,
+            batch_size=batch_size,
+            max_steps=max_steps,
+            val_check_steps=val_check_steps,
+            learning_rate=lr,
+            loss=train_loss_criteria,
+            random_seed=constants.RANDOM_STATE,
+        ),
+        NLinear(
+            h=horizon,
+            input_size=horizon,
+            batch_size=batch_size,
+            max_steps=max_steps,
+            val_check_steps=val_check_steps,
+            learning_rate=lr,
+            loss=train_loss_criteria,
+            random_seed=constants.RANDOM_STATE,
+        ),
+        DLinear(
+            h=horizon,
+            input_size=horizon,
+            batch_size=batch_size,
+            max_steps=max_steps,
+            val_check_steps=val_check_steps,
+            learning_rate=lr,
+            loss=train_loss_criteria,
+            random_seed=constants.RANDOM_STATE,
+        ),
+        Autoformer(
             h=horizon,
             input_size=horizon,
             batch_size=batch_size,
@@ -90,26 +146,6 @@ if __name__ == "__main__":
             loss=train_loss_criteria,
             hidden_size=32,
             conv_hidden_size=32,
-            random_seed=constants.RANDOM_STATE,
-        ),
-        NLinear(
-            h=horizon,
-            input_size=horizon,
-            batch_size=batch_size,
-            max_steps=max_steps,
-            val_check_steps=val_check_steps,
-            learning_rate=lr,
-            loss=train_loss_criteria,
-            random_seed=constants.RANDOM_STATE,
-        ),
-        Autoformer(
-            h=horizon,
-            input_size=horizon,
-            batch_size=batch_size,
-            max_steps=max_steps,
-            val_check_steps=val_check_steps,
-            learning_rate=lr,
-            loss=train_loss_criteria,
             random_seed=constants.RANDOM_STATE,
         ),
     ]
