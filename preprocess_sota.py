@@ -43,24 +43,24 @@ def group_routes_by_flight_date(dataframe):
     """
     # If there are multiple rows with the same searchDate in a group, pool them together by taking the mean
     # For the rest of the columns, we can take the first value since they should be the same
-    avg_cols = ["baseFare", "totalFare", "seatsRemaining"]
+    group_by_cols = [
+        "startingAirport",
+        "destinationAirport",
+        "flightDate",
+        "searchDate",
+    ]
+    avg_cols = ["totalFare", "seatsRemaining"]
 
+    # first_cols == cols that we simply take the first value
+    # they refer to all columns that are not in avg_cols or the columns that we are grouping by
     first_cols = [
-        "fareBasisCode",
-        "elapsedDays",
-        "isBasicEconomy",
-        "isRefundable",
-        "isNonStop",
-        "totalTravelDistance",
-        "segmentsAirlineCode",
-        "segmentsEquipmentDescription",
-        "segmentsCabinCode",
+        col
+        for col in dataframe.columns
+        if not (col in avg_cols or col in group_by_cols)
     ]
 
     grouped_df = (
-        dataframe.groupby(
-            ["startingAirport", "destinationAirport", "flightDate", "searchDate"]
-        )
+        dataframe.groupby(group_by_cols)
         .agg(
             {
                 **{col: "mean" for col in avg_cols},
@@ -81,14 +81,130 @@ def group_routes_by_flight_date(dataframe):
     return route_date_groups
 
 
+def format_columns(df):
+    start_time = time.time()
+    RENAME_MAPPING = {"searchDate": "ds", "totalFare": "y"}
+    # Ensure that the date columns are datetime objects
+    df["searchDate"] = df["searchDate"].apply(parse_date)
+    df["flightDate"] = df["flightDate"].apply(parse_date)
+    COLS_TO_KEEP = [
+        "unique_id",
+        "searchDate",
+        "totalFare",
+        "seatsRemaining",
+        # NOTE: "flightDate" is dropped at the end of this function
+        "flightDate",
+        # TODO: uncomment this if we want to include totalTravelDistance
+        # "totalTravelDistance",
+        "segmentsDepartureTimeEpochSeconds",
+    ]
+    cols_to_keep_final = COLS_TO_KEEP.copy()
+    for col in df.columns:
+        if col.startswith("startingAirport_") or col.startswith("destinationAirport_"):
+            cols_to_keep_final.append(col)
+
+    df = df[cols_to_keep_final].copy()
+
+    # day of week (0 = Monday, 6 = Sunday)
+    df["searchDayOfWeek"] = df["searchDate"].dt.weekday
+    df["flightDayOfWeek"] = df["flightDate"].dt.weekday
+
+    # days between search and flight dates
+    df["daysBetweenSearchAndFlight"] = (df["flightDate"] - df["searchDate"]).dt.days
+
+    # month of search and flight dates
+    df["searchMonth"] = df["searchDate"].dt.month
+    df["flightMonth"] = df["flightDate"].dt.month
+
+    # Convert the epoch seconds to a datetime column in UTC
+    df["segmentsDepartureTime"] = pd.to_datetime(
+        df["segmentsDepartureTimeEpochSeconds"], unit="s", utc=True
+    )
+    # hour that flight departed in UTC
+    df["departureHourUTC"] = df["segmentsDepartureTime"].dt.hour
+
+    # Rename columns
+    df = df.rename(columns=RENAME_MAPPING)
+
+    # drop columns that are not needed for the model
+    df = df.drop(
+        columns=[
+            "flightDate",
+            "segmentsDepartureTime",
+            "segmentsDepartureTimeEpochSeconds",
+        ]
+    )
+
+    print(f"Time taken to filter columns: {time.time() - start_time:.2f} seconds")
+    return df
+
+
+def one_hot_encode(df, col):
+    start_time = time.time()
+    # Factorize the column: returns a codes array (numerical representation)
+    # and an Index of unique values (e.g., Index(['A', 'B', 'C']))
+    codes, uniques = pd.factorize(df[col])
+
+    # temporarily store the unique values in a new column
+    df["airport_code"] = codes
+
+    # One-hot encode the numeric column using get_dummies
+    one_hot = pd.get_dummies(df["airport_code"], prefix=col)
+
+    # convert from true/false to 1/0
+    one_hot = one_hot.astype(int)
+
+    # drop the temporary column
+    df = df.drop(columns=["airport_code"])
+
+    # Join the dummy columns back to the original dataframe
+    df = df.join(one_hot)
+
+    print(f"Time taken to one-hot encode {col}: {time.time() - start_time:.2f} seconds")
+    return df
+
+
+def split_dfs_into_halves(groups):
+    """
+    Splits each DataFrame in the provided list into two halves,
+    and concatenates all first halves and second halves into two separate DataFrames.
+
+    Parameters:
+        groups (list of pd.DataFrame): List of grouped DataFrames to split.
+
+    Returns:
+        tuple: A tuple containing:
+            - first_df (pd.DataFrame): Concatenation of the first halves of all dfs.
+            - second_df (pd.DataFrame): Concatenation of the second halves of all dfs.
+    """
+    first_halves = []
+    second_halves = []
+
+    for group_df in groups:
+        half_point = len(group_df) // 2  # Determine the split point
+        first_halves.append(group_df.iloc[:half_point].copy())
+        second_halves.append(group_df.iloc[half_point:].copy())
+
+    first_df = (
+        pd.concat(first_halves, ignore_index=True) if first_halves else pd.DataFrame()
+    )
+    second_df = (
+        pd.concat(second_halves, ignore_index=True) if second_halves else pd.DataFrame()
+    )
+
+    return first_df, second_df
+
+
 def preprocess_data(
     df,
     sequence_length,
 ):
+    # TODO: uncomment this if we want to include totalTravelDistance
+    # remove rows where totalTravelDistance is empty
+    # df = df[df["totalTravelDistance"].notna()]
 
-    # Ensure that the date columns are datetime objects
-    if not pd.api.types.is_datetime64_any_dtype(df["searchDate"]):
-        df["searchDate"] = df["searchDate"].apply(parse_date)
+    df = one_hot_encode(df, "startingAirport")
+    df = one_hot_encode(df, "destinationAirport")
 
     # Group routes by flight date
     route_date_groups = group_routes_by_flight_date(df)
@@ -144,80 +260,55 @@ def preprocess_data(
     )
     # Step 5b: For test and validation groups, split each processed group individually
     # so that "test_first" holds the first half and "test_second" holds the second half.
-    test_first_halves = []
-    test_second_halves = []
-    for group_df in test_groups:
-        half_point = len(group_df) // 2  # Determine the split point
-        first_half = group_df.iloc[:half_point].copy()
-        second_half = group_df.iloc[half_point:].copy()
-        # Append a suffix to differentiate the halves
-        first_half["unique_id"] = first_half["unique_id"] + "_first"
-        second_half["unique_id"] = second_half["unique_id"] + "_second"
-        test_first_halves.append(first_half)
-        test_second_halves.append(second_half)
-    test_first_df = (
-        pd.concat(test_first_halves, ignore_index=True)
-        if test_first_halves
-        else pd.DataFrame()
-    )
-    test_second_df = (
-        pd.concat(test_second_halves, ignore_index=True)
-        if test_second_halves
-        else pd.DataFrame()
-    )
+    test_first_df, test_second_df = split_dfs_into_halves(test_groups)
+    val_first_df, val_second_df = split_dfs_into_halves(val_groups)
 
-    val_first_halves = []
-    val_second_halves = []
-    for group_df in val_groups:
-        half_point = len(group_df) // 2  # Determine the split point
-        first_half = group_df.iloc[:half_point].copy()
-        second_half = group_df.iloc[half_point:].copy()
-        first_half["unique_id"] = first_half["unique_id"] + "_first"
-        second_half["unique_id"] = second_half["unique_id"] + "_second"
-        val_first_halves.append(first_half)
-        val_second_halves.append(second_half)
-    val_first_df = (
-        pd.concat(val_first_halves, ignore_index=True)
-        if val_first_halves
-        else pd.DataFrame()
-    )
-    val_second_df = (
-        pd.concat(val_second_halves, ignore_index=True)
-        if val_second_halves
-        else pd.DataFrame()
-    )
-
-    # Step 6: Rename columns and drop unnecessary columns
-    rename_mapping = {"searchDate": "ds", "totalFare": "y"}
-    drop_cols = [
-        "startingAirport",
-        "destinationAirport",
-        "flightDate",
-        "baseFare",
-        "seatsRemaining",
-        "fareBasisCode",
-        "elapsedDays",
-        "isBasicEconomy",
-        "isRefundable",
-        "isNonStop",
-        "totalTravelDistance",
-        "segmentsAirlineCode",
-        "segmentsEquipmentDescription",
-        "segmentsCabinCode",
+    all_dfs = [
+        train_df,
+        test_first_df,
+        test_second_df,
+        val_first_df,
+        val_second_df,
     ]
 
-    train_df_condensed = train_df.rename(columns=rename_mapping).drop(columns=drop_cols)
-    test_first_df_condensed = test_first_df.rename(columns=rename_mapping).drop(columns=drop_cols)
-    test_second_df_condensed = test_second_df.rename(columns=rename_mapping).drop(columns=drop_cols)
-    val_first_df_condensed = val_first_df.rename(columns=rename_mapping).drop(columns=drop_cols)
-    val_second_df_condensed = val_second_df.rename(columns=rename_mapping).drop(columns=drop_cols)
+    static_dfs = []
+    for i, cur_df in enumerate(all_dfs):
+        # Get the first occurrence for each unique value in "unique_id"
+        unique_rows = cur_df.drop_duplicates(subset="unique_id", keep="first")
+
+        # Determine the columns to keep
+        cols_to_keep = []
+        for col in unique_rows.columns:
+            if col == "unique_id":
+                cols_to_keep.append(col)
+            elif col.startswith("startingAirport_") or col.startswith(
+                "destinationAirport_"
+            ):
+                cols_to_keep.append(col)
+
+        # Filter the DataFrame based on the selected columns
+        filtered_df = unique_rows[cols_to_keep]
+        static_dfs.append(filtered_df)
+
+        # only keep columns relevant to model and not in static_df
+        all_dfs[i] = format_columns(cur_df)
+
+    # overwrite the original dfs with the formatted ones
+    train_df, test_first_df, test_second_df, val_first_df, val_second_df = all_dfs
+
+    # Concatenate all the filtered dfs
+    # we drop duplicates again across all dfs just in case some unique_ids show up in more than one df
+    static_df = pd.concat(static_dfs, ignore_index=True).drop_duplicates(
+        subset="unique_id", keep="first"
+    )
 
     # Step 7: Save the CSV files for each split
-    train_df_condensed.to_csv(f"{constants.SAVED_DIR}/train.csv", index=False)
-    test_first_df_condensed.to_csv(f"{constants.SAVED_DIR}/test_first.csv", index=False)
-    test_second_df_condensed.to_csv(f"{constants.SAVED_DIR}/test_second.csv", index=False)
-    val_first_df_condensed.to_csv(f"{constants.SAVED_DIR}/validation_first.csv", index=False)
-    val_second_df_condensed.to_csv(f"{constants.SAVED_DIR}/validation_second.csv", index=False)
+    train_df.to_csv(f"{constants.SAVED_DIR}/train.csv", index=False)
+    test_first_df.to_csv(f"{constants.SAVED_DIR}/test_first.csv", index=False)
+    test_second_df.to_csv(f"{constants.SAVED_DIR}/test_second.csv", index=False)
+    val_first_df.to_csv(f"{constants.SAVED_DIR}/validation_first.csv", index=False)
+    val_second_df.to_csv(f"{constants.SAVED_DIR}/validation_second.csv", index=False)
+    static_df.to_csv(f"{constants.SAVED_DIR}/static.csv", index=False)
 
     return {
         "X_train": train_df,
@@ -225,17 +316,18 @@ def preprocess_data(
         "X_test_second": test_second_df,
         "X_val_first": val_first_df,
         "X_val_second": val_second_df,
+        "static": static_df,
     }
 
 
 # Save processed data and fitted scaler to disk.
-def save_processed_data(data, data_filepath=constants.PROCESSED_DATA_FILE):
+def save_processed_data(data, data_filepath):
     with open(data_filepath, "wb") as f:
         pickle.dump(data, f)
 
 
 # Load processed data and scaler from disk.
-def load_processed_data(data_filepath=constants.PROCESSED_DATA_FILE):
+def load_processed_data(data_filepath):
     with open(data_filepath, "rb") as f:
         data = pickle.load(f)
 
@@ -268,15 +360,17 @@ def load_raw_data(filepath=constants.RAW_DATA_PATH):
 
 
 # Main function to get data. It will load from cache if available unless forced to reprocess.
-def get_data(force_reprocess=False, sequence_length=30, time_steps=None):
-    if not force_reprocess and os.path.exists(constants.PROCESSED_DATA_FILE):
+def get_data(data_filepath, force_reprocess=False, sequence_length=30, time_steps=None):
+    if not force_reprocess and os.path.exists(data_filepath):
         print("Loading preprocessed data from disk...")
-        data = load_processed_data()
+        data = load_processed_data(data_filepath=data_filepath)
     else:
         print("Processing raw data...")
         df = load_raw_data()
+        start_time = time.time()
         data = preprocess_data(df, sequence_length=sequence_length)
-        save_processed_data(data)
+        print(f"Time taken to preprocess data: {time.time() - start_time:.2f} seconds")
+        save_processed_data(data, data_filepath)
 
     if time_steps is not None:
         half_sequence_length = sequence_length // 2
@@ -306,9 +400,35 @@ def save_to_csv(arr, filename):
 
 if __name__ == "__main__":
     # This will run the full pipeline only if cached files are missing.
-    data = get_data(force_reprocess=False)
-    print(f"Train data shape: {data['X_train'].shape}")
-    print(f"Test data shape: {data['X_test_first'].shape}")
-    print(f"Validation data shape: {data['X_val_first'].shape}")
-    print(f"Test data second shape: {data['X_test_second'].shape}")
-    print(f"Validation data second shape: {data['X_val_second'].shape}")
+    data = get_data(
+        data_filepath=constants.PROCESSED_DATA_FILE_SOTA, force_reprocess=True
+    )
+
+    train_df = data["X_train"]
+    test_first_df = data["X_test_first"]
+    test_second_df = data["X_test_second"]
+    val_first_df = data["X_val_first"]
+    val_second_df = data["X_val_second"]
+    static_df = data["static"]
+
+    print(f"Train data shape: {train_df.shape}")
+    print(f"Test data shape: {test_first_df.shape}")
+    print(f"Test data second shape: {test_second_df.shape}")
+    print(f"Validation data shape: {val_first_df.shape}")
+    print(f"Validation data second shape: {val_second_df.shape}")
+    # EXPECTED: 4898100 / 30 + (306135 * 2 / 15) == 204088
+    print(f"Static data shape: {static_df.shape}")
+
+# WITH TOTAL TRAVEL DISTANCE
+# Train data shape: (4552080, 14); 151736
+# Test data shape: (284520, 14)
+# Validation data shape: (284505, 14)
+# Test data second shape: (284520, 14)
+# Validation data second shape: (284505, 14)
+
+# WITHOUT TOTAL TRAVEL DISTANCE
+# Train data shape: (4898100, 13); 163270
+# Test data shape: (306135, 13)
+# Validation data shape: (306135, 13)
+# Test data second shape: (306135, 13)
+# Validation data second shape: (306135, 13)
