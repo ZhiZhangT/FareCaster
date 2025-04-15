@@ -435,8 +435,29 @@ def get_last_time_steps(data, time_steps):
     return data_sliced
 
 
+def reduce_prediction_len(data, prediction_len):
+    """
+    Slices the second dimension of each data array to keep only the last {time_steps} time steps.
+    """
+    data_sliced = {}
+    for key, array in data.items():
+        # if data[key] is referring to the target dataset (e.g. y_train)
+        if "y_" in key:
+            # ensure the array has at least two dimensions and enough time steps
+            if array.ndim == 2 and array.shape[1] >= prediction_len:
+                data_sliced[key] = array[:, -prediction_len:]
+            else:
+                raise ValueError(f"Unexpected array shape for key {key}: {array.shape}")
+        else:
+            # otherwise, keep the original array
+            data_sliced[key] = array
+    return data_sliced
+
+
 # Main function to get data. It will load from cache if available unless forced to reprocess.
-def get_data(force_reprocess=False, sequence_length=30, time_steps=None):
+def get_data(
+    force_reprocess=False, sequence_length=30, time_steps=None, prediction_len=None
+):
     if not force_reprocess and os.path.exists(constants.PROCESSED_DATA_FILE):
         print("Loading preprocessed data from disk...")
         data = load_processed_data()
@@ -452,15 +473,22 @@ def get_data(force_reprocess=False, sequence_length=30, time_steps=None):
             raise ValueError(
                 f"time_steps should be less than or equal to half of sequence_length ({half_sequence_length})."
             )
-        data_sliced = get_last_time_steps(data, time_steps)
-        return data_sliced
-    else:
-        return data
+        data = get_last_time_steps(data, time_steps)
+
+    if prediction_len is not None:
+        half_sequence_length = sequence_length // 2
+        if prediction_len > half_sequence_length:
+            raise ValueError(
+                f"prediction_len should be less than or equal to half of sequence_length ({half_sequence_length})."
+            )
+        data = reduce_prediction_len(data, prediction_len)
+
+    return data
 
 
 if __name__ == "__main__":
     # This will run the full pipeline only if cached files are missing.
-    data = get_data(force_reprocess=False)
+    data = get_data(force_reprocess=False, prediction_len=7)
     print("Train data shape:", data["X_train_scaled"].shape)
     print("Validation data shape:", data["X_val_scaled"].shape)
     print("Test data shape:", data["X_test_scaled"].shape)
