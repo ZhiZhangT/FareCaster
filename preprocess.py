@@ -416,7 +416,7 @@ def load_processed_data(data_filepath=constants.PROCESSED_DATA_FILE):
 
 def reduce_history_len(data, time_steps):
     """
-    Slices the second dimension of each data array to keep only the last {time_steps} time steps.
+    Slices the second dimension of each data array to keep only the LAST {time_steps} time steps.
     """
     data_sliced = {}
     for key, array in data.items():
@@ -435,7 +435,7 @@ def reduce_history_len(data, time_steps):
 
 def reduce_prediction_len(data, prediction_len):
     """
-    Slices the second dimension of each data array to keep only the last {time_steps} time steps.
+    Slices the second dimension of each data array to keep only the FIRST {time_steps} time steps.
     """
     data_sliced = {}
     for key, array in data.items():
@@ -443,7 +443,7 @@ def reduce_prediction_len(data, prediction_len):
         if "y_" in key:
             # ensure the array has exactly two dimensions and enough time steps
             if array.ndim == 2 and array.shape[1] >= prediction_len:
-                data_sliced[key] = array[:, -prediction_len:]
+                data_sliced[key] = array[:, :prediction_len]
             else:
                 raise ValueError(f"Unexpected array shape for key {key}: {array.shape}")
         else:
