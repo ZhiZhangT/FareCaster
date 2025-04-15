@@ -359,23 +359,30 @@ def preprocess_data(
     X_val_scaled = scale_data(X_val, scaler, numeric_indices)
     X_test_scaled = scale_data(X_test, scaler, numeric_indices)
 
-    X_train_final = cyclical_encode(X_train_scaled, feature_cols, cyclical_features)
-    X_val_final = cyclical_encode(X_val_scaled, feature_cols, cyclical_features)
-    X_test_final = cyclical_encode(X_test_scaled, feature_cols, cyclical_features)
+    # X_train_final = cyclical_encode(X_train_scaled, feature_cols, cyclical_features)
+    # X_val_final = cyclical_encode(X_val_scaled, feature_cols, cyclical_features)
+    # X_test_final = cyclical_encode(X_test_scaled, feature_cols, cyclical_features
+    X_train_final = X_train_scaled
+    X_val_final = X_val_scaled
+    X_test_final = X_test_scaled
 
     X_train_sliding_scaled = scale_data(X_train_sliding, scaler, numeric_indices)
     X_val_sliding_scaled = scale_data(X_val_sliding, scaler, numeric_indices)
     X_test_sliding_scaled = scale_data(X_test_sliding, scaler, numeric_indices)
 
-    X_train_sliding_final = cyclical_encode(
-        X_train_sliding_scaled, feature_cols, cyclical_features
-    )
-    X_val_sliding_final = cyclical_encode(
-        X_val_sliding_scaled, feature_cols, cyclical_features
-    )
-    X_test_sliding_final = cyclical_encode(
-        X_test_sliding_scaled, feature_cols, cyclical_features
-    )
+    # X_train_sliding_final = cyclical_encode(
+    #     X_train_sliding_scaled, feature_cols, cyclical_features
+    # )
+    # X_val_sliding_final = cyclical_encode(
+    #     X_val_sliding_scaled, feature_cols, cyclical_features
+    # )
+    # X_test_sliding_final = cyclical_encode(
+    #     X_test_sliding_scaled, feature_cols, cyclical_features
+    # )
+    
+    X_train_sliding_final = X_train_sliding_scaled
+    X_val_sliding_final = X_val_sliding_scaled
+    X_test_sliding_final = X_test_sliding_scaled
 
     # --- Package the Data ---
 

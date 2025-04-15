@@ -139,6 +139,77 @@ class LSTMModelDeep(nn.Module):
         out = out.unsqueeze(1)  # shape: (batch, 1, output_size)
         return out
 
+# -------------------------------
+# LSTM Encoder-Decoder model
+# -------------------------------
+class LSTMEncoderDecoder(nn.Module):
+    def __init__(
+        self,
+        input_size,
+        output_size,
+        hidden_size=32,
+        num_layers=2,
+        dropout=0.2,
+    ):
+        """
+        LSTM-based Encoder-Decoder model for time series forecasting.
+        
+        Args:
+            input_size (int): Number of input features
+            output_size (int): Number of output features to predict
+            hidden_size (int): Size of hidden layers
+            num_layers (int): Number of LSTM layers in encoder and decoder
+            dropout (float): Dropout probability (applied if num_layers > 1)
+        """
+        super(LSTMEncoderDecoder, self).__init__()
+        
+        # Encoder
+        self.encoder = nn.LSTM(
+            input_size=input_size,
+            hidden_size=hidden_size,
+            num_layers=num_layers,
+            batch_first=True,
+            dropout=dropout if num_layers > 1 else 0
+        )
+        
+        # Decoder
+        self.decoder = nn.LSTM(
+            input_size=1,  # Decoder input is a single value
+            hidden_size=hidden_size,
+            num_layers=num_layers,
+            batch_first=True,
+            dropout=dropout if num_layers > 1 else 0
+        )
+        
+        # Output projection
+        self.fc = nn.Linear(hidden_size, output_size)
+    
+    def forward(self, x):
+        """
+        Forward pass through the encoder-decoder model.
+        
+        Args:
+            x: Input tensor with shape (batch_size, seq_len, input_size)
+            
+        Returns:
+            Output tensor with shape (batch_size, 1, output_size)
+        """
+        batch_size = x.size(0)
+        
+        # Encode the input sequence
+        _, (hidden, cell) = self.encoder(x)
+        
+        # Initial decoder input (zeros)
+        decoder_input = torch.zeros(batch_size, 1, 1, device=x.device)
+        
+        # Pass through decoder with encoder's hidden state
+        decoder_output, _ = self.decoder(decoder_input, (hidden, cell))
+        
+        # Project to output size
+        output = self.fc(decoder_output)  # Shape: [batch_size, 1, output_size]
+        
+        return output
+    
 
 # -------------------------------
 # Transformer model

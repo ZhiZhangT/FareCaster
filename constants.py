@@ -1,21 +1,21 @@
-SAVED_DIR = "saved/"
+SAVED_DIR = "FareCaster/saved/"
 RANDOM_STATE = 42
-VALIDATION_FILEPATH = "data/itineraries_10perc_validation.csv"
+VALIDATION_FILEPATH = "FareCaster/data/itineraries_10perc_validation.csv"
 TEST_FILEPATH = "data/itineraries_10perc_test.csv"
-RAW_DATA_PATH = "data/itineraries_10perc.csv"
+RAW_DATA_PATH = "FareCaster/data/itineraries_10perc.csv"
 PROCESSED_DATA_FILE = f"{SAVED_DIR}preprocessed_data.pkl"
 SCALER_FILE = f"{SAVED_DIR}scaler.pkl"
 TARGET_COL = "totalFare"
 FEATURE_COLS = [
-    "startingAirport_enc",
-    "destinationAirport_enc",
-    "seatsRemaining",
-    "searchDayOfWeek",
-    "flightDayOfWeek",
-    "daysBetweenSearchAndFlight",
-    "searchMonth",
-    "flightMonth",
-    "departureHourUTC",
+    # "startingAirport_enc",
+    # "destinationAirport_enc",
+    # "seatsRemaining",
+    # "searchDayOfWeek",
+    # "flightDayOfWeek",
+    # "daysBetweenSearchAndFlight",
+    # "searchMonth",
+    # "flightMonth",
+    # "departureHourUTC",
     TARGET_COL,
 ]
 CATEGORICAL_COLS = [
