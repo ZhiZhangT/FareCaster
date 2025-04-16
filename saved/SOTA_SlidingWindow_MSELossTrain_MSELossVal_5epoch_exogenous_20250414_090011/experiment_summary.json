@@ -1,0 +1,82 @@
+{
+  "hyperparameters": {
+    "common": {
+      "batch_size": 32,
+      "num_epochs": 5,
+      "learning_rate": 0.0005,
+      "sequence_length": 15,
+      "encoder_n_layers": 1,
+      "decoder_n_layers": 1,
+      "encoder_hidden_size": 16,
+      "decoder_hidden_size": 64,
+      "use_sliding_window": true,
+      "stat_exog_list": [
+        "startingAirport_0",
+        "startingAirport_1",
+        "startingAirport_2",
+        "startingAirport_3",
+        "startingAirport_4",
+        "startingAirport_5",
+        "startingAirport_6",
+        "startingAirport_7",
+        "startingAirport_8",
+        "startingAirport_9",
+        "startingAirport_10",
+        "startingAirport_11",
+        "startingAirport_12",
+        "startingAirport_13",
+        "startingAirport_14",
+        "startingAirport_15",
+        "destinationAirport_0",
+        "destinationAirport_1",
+        "destinationAirport_2",
+        "destinationAirport_3",
+        "destinationAirport_4",
+        "destinationAirport_5",
+        "destinationAirport_6",
+        "destinationAirport_7",
+        "destinationAirport_8",
+        "destinationAirport_9",
+        "destinationAirport_10",
+        "destinationAirport_11",
+        "destinationAirport_12",
+        "destinationAirport_13",
+        "destinationAirport_14",
+        "destinationAirport_15"
+      ],
+      "hist_exog_list": [
+        "searchDayOfWeek",
+        "flightDayOfWeek",
+        "daysBetweenSearchAndFlight",
+        "searchMonth",
+        "flightMonth",
+        "departureHourUTC",
+        "seatsRemaining"
+      ],
+      "train_loss_criteria": "MSE",
+      "val_loss_criteria": "MSE"
+    }
+  },
+  "results": {
+    "NBEATS": {
+      "best_val_loss": 31628.806640625,
+      "best_val_mae": 121.93147277832031
+    },
+    "NHITS": {
+      "best_val_loss": 31829.353515625,
+      "best_val_mae": 123.70558166503906
+    },
+    "LSTM": {
+      "best_val_loss": 53288.2890625,
+      "best_val_mae": 143.40187072753906
+    },
+    "NLinear": {
+      "best_val_loss": 35137.546875,
+      "best_val_mae": 128.92897033691406
+    },
+    "DLinear": {
+      "best_val_loss": 34271.66796875,
+      "best_val_mae": 127.26129150390625
+    }
+  }
+}

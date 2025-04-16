@@ -1,9 +1,15 @@
-import logging
-
 import pandas as pd
 
 from neuralforecast import NeuralForecast
-from neuralforecast.models import LSTM, TimesNet, Autoformer, NLinear, DLinear
+from neuralforecast.models import (
+    LSTM,
+    TimesNet,
+    Autoformer,
+    NLinear,
+    DLinear,
+    NBEATS,
+    NHITS,
+)
 from neuralforecast.losses.pytorch import MAE, MSE
 
 import torch
@@ -15,7 +21,6 @@ import matplotlib.pyplot as plt
 import json
 from utils.logging import create_run_directory, Logger, plot_losses
 
-
 if __name__ == "__main__":
     # hyperparameters
     # number of steps to predict
@@ -26,7 +31,57 @@ if __name__ == "__main__":
     val_check_steps = 5103
     # max_steps == number of batches per epoch * number of epochs
     max_steps = val_check_steps * num_epochs
-    lr = 0.005
+    # based on empirical findings, use either 0.0005 or 0.0010
+    lr = 0.0005
+    # based on empirical findings
+    encoder_n_layers = 1
+    decoder_layers = 1
+    encoder_hidden_size = 16  # memory vector size
+    decoder_hidden_size = 64  # fully connected layer size
+    # see here for more information: https://nixtlaverse.nixtla.io/neuralforecast/docs/capabilities/exogenous_variables.html#3-training-with-exogenous-variables
+    stat_exog_list = [
+        "startingAirport_0",
+        "startingAirport_1",
+        "startingAirport_2",
+        "startingAirport_3",
+        "startingAirport_4",
+        "startingAirport_5",
+        "startingAirport_6",
+        "startingAirport_7",
+        "startingAirport_8",
+        "startingAirport_9",
+        "startingAirport_10",
+        "startingAirport_11",
+        "startingAirport_12",
+        "startingAirport_13",
+        "startingAirport_14",
+        "startingAirport_15",
+        "destinationAirport_0",
+        "destinationAirport_1",
+        "destinationAirport_2",
+        "destinationAirport_3",
+        "destinationAirport_4",
+        "destinationAirport_5",
+        "destinationAirport_6",
+        "destinationAirport_7",
+        "destinationAirport_8",
+        "destinationAirport_9",
+        "destinationAirport_10",
+        "destinationAirport_11",
+        "destinationAirport_12",
+        "destinationAirport_13",
+        "destinationAirport_14",
+        "destinationAirport_15",
+    ]
+    hist_exog_list = [
+        "searchDayOfWeek",
+        "flightDayOfWeek",
+        "daysBetweenSearchAndFlight",
+        "searchMonth",
+        "flightMonth",
+        "departureHourUTC",
+        "seatsRemaining",
+    ]
     train_loss_criteria = MSE()
     val_loss_criteria = MSE()
 
@@ -48,7 +103,15 @@ if __name__ == "__main__":
                 "num_epochs": num_epochs,
                 "learning_rate": lr,
                 "sequence_length": horizon,
+                "encoder_n_layers": encoder_n_layers,
+                "decoder_layers": decoder_layers,
+                "encoder_hidden_size": encoder_hidden_size,
+                "decoder_hidden_size": decoder_hidden_size,
                 "use_sliding_window": True,  # only sliding window data is available
+                "stat_exog_list": stat_exog_list,
+                "hist_exog_list": hist_exog_list,
+                "train_loss_criteria": train_loss_criteria_name,
+                "val_loss_criteria": val_loss_criteria_name,
             },
         }
     }
@@ -59,6 +122,7 @@ if __name__ == "__main__":
     random.seed(constants.RANDOM_STATE)
 
     df = pd.read_csv("saved/train.csv")
+    static_df = pd.read_csv("saved/static.csv")
     df_val_first = pd.read_csv("saved/validation_first.csv")
     df_val_second = pd.read_csv("saved/validation_second.csv")
 
@@ -70,7 +134,7 @@ if __name__ == "__main__":
     print(f"Shape of df_val: {df_val_first.shape}")
 
     models = [
-        LSTM(
+        NBEATS(
             h=horizon,
             input_size=horizon,
             batch_size=batch_size,
@@ -80,18 +144,35 @@ if __name__ == "__main__":
             loss=train_loss_criteria,
             random_seed=constants.RANDOM_STATE,
         ),
-        TimesNet(
-            h=horizon,  # number of steps to predict
-            input_size=horizon,  # length of input sequence
+        NHITS(
+            hist_exog_list=hist_exog_list,
+            stat_exog_list=stat_exog_list,
+            h=horizon,
+            input_size=horizon,
             batch_size=batch_size,
             max_steps=max_steps,
             val_check_steps=val_check_steps,
             learning_rate=lr,
             loss=train_loss_criteria,
-            hidden_size=32,
-            conv_hidden_size=32,
             random_seed=constants.RANDOM_STATE,
         ),
+        LSTM(
+            stat_exog_list=stat_exog_list,
+            hist_exog_list=hist_exog_list,
+            h=horizon,
+            input_size=horizon,
+            batch_size=batch_size,
+            max_steps=max_steps,
+            val_check_steps=val_check_steps,
+            learning_rate=lr,
+            loss=train_loss_criteria,
+            random_seed=constants.RANDOM_STATE,
+            encoder_n_layers=encoder_n_layers,
+            decoder_layers=decoder_layers,
+            encoder_hidden_size=encoder_hidden_size,
+            decoder_hidden_size=decoder_hidden_size,
+        ),
+        # NLinear does not actually support future/static exogenous variables
         NLinear(
             h=horizon,
             input_size=horizon,
@@ -102,7 +183,8 @@ if __name__ == "__main__":
             loss=train_loss_criteria,
             random_seed=constants.RANDOM_STATE,
         ),
-        Autoformer(
+        # DLinear does not actually support future/static exogenous variables
+        DLinear(
             h=horizon,
             input_size=horizon,
             batch_size=batch_size,
@@ -112,15 +194,41 @@ if __name__ == "__main__":
             loss=train_loss_criteria,
             random_seed=constants.RANDOM_STATE,
         ),
+        # Autoformer(
+        #     stat_exog_list=stat_exog_list,
+        #     hist_exog_list=hist_exog_list,
+        #     h=horizon,
+        #     input_size=horizon,
+        #     batch_size=batch_size,
+        #     max_steps=max_steps,
+        #     val_check_steps=val_check_steps,
+        #     learning_rate=lr,
+        #     loss=train_loss_criteria,
+        #     random_seed=constants.RANDOM_STATE,
+        # ),
+        # TimesNet(
+        #     stat_exog_list=stat_exog_list,
+        #     hist_exog_list=hist_exog_list,
+        #     h=horizon,  # number of steps to predict
+        #     input_size=horizon,  # length of input sequence
+        #     batch_size=batch_size,
+        #     max_steps=max_steps,
+        #     val_check_steps=val_check_steps,
+        #     learning_rate=lr,
+        #     loss=train_loss_criteria,
+        #     hidden_size=32,
+        #     conv_hidden_size=32,
+        #     random_seed=constants.RANDOM_STATE,
+        # ),
     ]
 
     # TRAIN THE MODEL
     nf = NeuralForecast(models=models, freq="D")
-    nf.fit(df=df)
+    nf.fit(df=df, static_df=static_df)
     nf.save(path=f"{run_dir}/nixtla")
 
     # TEST MODEL ON VALIDATION SET
-    Y_hat_df_val = nf.predict(df=df_val_first)
+    Y_hat_df_val = nf.predict(df=df_val_first, static_df=static_df)
     print(f"Shape of Y_hat_df_val: {Y_hat_df_val.shape}")
     # save the predictions to a CSV file
     Y_hat_df_val.to_csv(f"{run_dir}/validation_predictions.csv", index=False)
@@ -175,7 +283,7 @@ if __name__ == "__main__":
     model_names = list(results.keys())
     mae_values = [results[m]["best_val_mae"] for m in model_names]
     # Use a subset of colors based on the number of models
-    colors = ["blue", "green", "purple", "red"][: len(model_names)]
+    colors = ["blue", "green", "purple", "red", "yellow"][: len(model_names)]
     plt.bar(model_names, mae_values, color=colors)
     plt.title("Model Comparison: Val MAE")
     plt.ylabel("Mean Absolute Error")

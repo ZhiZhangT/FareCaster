@@ -1,0 +1,8 @@
+Shape of df: (4898100, 42)
+Shape of df_val: (306135, 42)
+Shape of Y_hat_df_val: (306135, 7)
+BEST NBEATS Model Val Loss: 31628.8066, Val MAE: 121.9315
+BEST NHITS Model Val Loss: 31829.3535, Val MAE: 123.7056
+BEST LSTM Model Val Loss: 53288.2891, Val MAE: 143.4019
+BEST NLinear Model Val Loss: 35137.5469, Val MAE: 128.9290
+BEST DLinear Model Val Loss: 34271.6680, Val MAE: 127.2613
