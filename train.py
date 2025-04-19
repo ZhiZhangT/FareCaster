@@ -3,7 +3,7 @@ import torch.nn as nn
 import time
 import os
 import sys
-from models import GRUModel, LSTMModel, GRUModelDeep, LSTMModelDeep, TransformerModel
+from models import GRUModel, LSTMModel, GRUModelDeep, LSTMModelDeep, TransformerModel, LSTMEncoderDecoder
 from torch.utils.data import TensorDataset, DataLoader
 from preprocess import get_data
 import matplotlib.pyplot as plt
@@ -342,6 +342,14 @@ if __name__ == "__main__":
                 "num_layers": transformer_num_layers,  # Transformers often need fewer layers
                 "nhead": transformer_nhead,
                 "dropout": transformer_dropout,
+            },
+        },
+        "EncoderDecoder": {
+            "class": LSTMEncoderDecoder,
+            "params": {
+                "hidden_size": model_hidden_size,
+                "num_layers": num_layers,
+                "dropout": 0.2,
             },
         },
     }

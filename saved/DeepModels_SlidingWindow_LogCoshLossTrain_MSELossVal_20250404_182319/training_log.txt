@@ -1,0 +1,19 @@
+Starting training run in directory: saved/DeepModels_SlidingWindow_LogCoshLossTrain_MSELossVal_20250404_182319
+Hyperparameters:
+  batch_size: 32
+  num_epochs: 50
+  learning rate: 0.005
+  num_layers: 5
+  fc_hidden_sizes: [512, 256, 128, 64, 32]
+  sequence_length: 30
+  use_sliding_window: True
+  transformer_hidden_size: 64
+  transformer_nhead: 4
+  transformer_dropout: 0.1
+Loading preprocessed data and scaler from disk...
+Train data shape: (163949, 15, 15), (163949, 15)
+Validation data shape: (20132, 15, 15), (20132, 15)
+input_size (number of features): 15
+
+Training GRU model...
+Training on device: mps
