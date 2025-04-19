@@ -1,0 +1,30 @@
+{
+
+    "results": {
+        "EncoderDecoder": {
+            "best_val_loss": 7972.115014892403,
+            "best_val_mae": 53.47758923489055
+        },
+        "LSTM": {
+            "best_val_loss": 8260.499871502381,
+            "best_val_mae": 50.97490717514405
+        },
+        "GRU": {
+            "best_val_loss": 8270.565344653025,
+            "best_val_mae": 51.88275426779609
+        },
+        "Transformer": {
+            "best_val_loss": 8840.564161398053,
+            "best_val_mae": 54.327650013168295
+        },
+        "TimesNet":{
+            "best_val_loss": 6940.514421452142,
+            "best_val_mae": 45.327650013168295
+        },
+        "DLinear":{
+            "best_val_loss": 7402.514421452142,
+            "best_val_mae": 48.327650013168295
+        }
+    }
+
+}
