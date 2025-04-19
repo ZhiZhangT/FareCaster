@@ -359,30 +359,30 @@ def preprocess_data(
     X_val_scaled = scale_data(X_val, scaler, numeric_indices)
     X_test_scaled = scale_data(X_test, scaler, numeric_indices)
 
-    # X_train_final = cyclical_encode(X_train_scaled, feature_cols, cyclical_features)
-    # X_val_final = cyclical_encode(X_val_scaled, feature_cols, cyclical_features)
-    # X_test_final = cyclical_encode(X_test_scaled, feature_cols, cyclical_features
-    X_train_final = X_train_scaled
-    X_val_final = X_val_scaled
-    X_test_final = X_test_scaled
+    X_train_final = cyclical_encode(X_train_scaled, feature_cols, cyclical_features)
+    X_val_final = cyclical_encode(X_val_scaled, feature_cols, cyclical_features)
+    X_test_final = cyclical_encode(X_test_scaled, feature_cols, cyclical_features)
+    # X_train_final = X_train_scaled
+    # X_val_final = X_val_scaled
+    # X_test_final = X_test_scaled
 
     X_train_sliding_scaled = scale_data(X_train_sliding, scaler, numeric_indices)
     X_val_sliding_scaled = scale_data(X_val_sliding, scaler, numeric_indices)
     X_test_sliding_scaled = scale_data(X_test_sliding, scaler, numeric_indices)
 
-    # X_train_sliding_final = cyclical_encode(
-    #     X_train_sliding_scaled, feature_cols, cyclical_features
-    # )
-    # X_val_sliding_final = cyclical_encode(
-    #     X_val_sliding_scaled, feature_cols, cyclical_features
-    # )
-    # X_test_sliding_final = cyclical_encode(
-    #     X_test_sliding_scaled, feature_cols, cyclical_features
-    # )
+    X_train_sliding_final = cyclical_encode(
+        X_train_sliding_scaled, feature_cols, cyclical_features
+    )
+    X_val_sliding_final = cyclical_encode(
+        X_val_sliding_scaled, feature_cols, cyclical_features
+    )
+    X_test_sliding_final = cyclical_encode(
+        X_test_sliding_scaled, feature_cols, cyclical_features
+    )
     
-    X_train_sliding_final = X_train_sliding_scaled
-    X_val_sliding_final = X_val_sliding_scaled
-    X_test_sliding_final = X_test_sliding_scaled
+    # X_train_sliding_final = X_train_sliding_scaled
+    # X_val_sliding_final = X_val_sliding_scaled
+    # X_test_sliding_final = X_test_sliding_scaled
 
     # --- Package the Data ---
 
@@ -463,14 +463,16 @@ def reduce_prediction_len(data, prediction_len):
 def get_data(
     force_reprocess=False, sequence_length=30, history_len=None, prediction_len=None
 ):
-    if not force_reprocess and os.path.exists(constants.PROCESSED_DATA_FILE):
-        print("Loading preprocessed data from disk...")
-        data = load_processed_data()
+    seqlen_processed_data_file = f"{constants.SAVED_DIR}preprocessed_data_seq_len_{sequence_length}.pkl"
+    if not force_reprocess and os.path.exists(seqlen_processed_data_file):
+        print(f"Loading preprocessed data from disk in file {seqlen_processed_data_file}...")
+        data = load_processed_data(data_filepath=seqlen_processed_data_file)
     else:
         print("Processing raw data...")
         df = load_raw_data()
         data = preprocess_data(df, sequence_length=sequence_length)
-        save_processed_data(data)
+        save_processed_data(data, data_filepath=seqlen_processed_data_file)
+        print(f"Preprocessed data saved to {seqlen_processed_data_file}.")
 
     if history_len is not None:
         half_sequence_length = sequence_length // 2
@@ -493,26 +495,32 @@ def get_data(
 
 if __name__ == "__main__":
     # This will run the full pipeline only if cached files are missing.
-    data = get_data(force_reprocess=False, history_len=8, prediction_len=7)
-    print("Train data shape:", data["X_train_scaled"].shape)
-    print("Validation data shape:", data["X_val_scaled"].shape)
-    print("Test data shape:", data["X_test_scaled"].shape)
-    print(
-        f"Train data for sliding window: {data['X_train_sliding_window_scaled'].shape}"
-    )
-    print(
-        f"Validation data for sliding window: {data['X_val_sliding_window_scaled'].shape}"
-    )
-    print(f"Test data for sliding window: {data['X_test_sliding_window_scaled'].shape}")
-    print(f"Train labels shape: {data['y_train'].shape}")
-    print(f"Validation labels shape: {data['y_val'].shape}")
-    print(f"Test labels shape: {data['y_test'].shape}")
-    print(
-        f"Train labels for sliding window shape: {data['y_train_sliding_window'].shape}"
-    )
-    print(
-        f"Validation labels for sliding window shape: {data['y_val_sliding_window'].shape}"
-    )
-    print(
-        f"Test labels for sliding window shape: {data['y_test_sliding_window'].shape}"
-    )
+    sequence_lengths = [2, 16, 30]
+    
+    for seq_len in sequence_lengths:
+        print(f"Processing data with sequence length: {seq_len}")
+        data = get_data(force_reprocess=True, sequence_length=seq_len)
+        print(f"Data with sequence length {seq_len} processed and saved.")
+    
+        print("Train data shape:", data["X_train_scaled"].shape)
+        print("Validation data shape:", data["X_val_scaled"].shape)
+        print("Test data shape:", data["X_test_scaled"].shape)
+        print(
+            f"Train data for sliding window: {data['X_train_sliding_window_scaled'].shape}"
+        )
+        print(
+            f"Validation data for sliding window: {data['X_val_sliding_window_scaled'].shape}"
+        )
+        print(f"Test data for sliding window: {data['X_test_sliding_window_scaled'].shape}")
+        print(f"Train labels shape: {data['y_train'].shape}")
+        print(f"Validation labels shape: {data['y_val'].shape}")
+        print(f"Test labels shape: {data['y_test'].shape}")
+        print(
+            f"Train labels for sliding window shape: {data['y_train_sliding_window'].shape}"
+        )
+        print(
+            f"Validation labels for sliding window shape: {data['y_val_sliding_window'].shape}"
+        )
+        print(
+            f"Test labels for sliding window shape: {data['y_test_sliding_window'].shape}"
+        )

@@ -219,6 +219,8 @@ def update_results_csv(summary, model_name, num_layers, fc_hidden_sizes, model_h
         'model_type': model_name,
         'batch_size': summary['hyperparameters']['common']['batch_size'],
         'sequence_length': summary['hyperparameters']['common']['sequence_length'],
+        'history_length': summary['hyperparameters']['common']['history_length'],
+        'prediction_length': summary['hyperparameters']['common']['prediction_length'],
         'model_hidden_size': model_hidden_size,
         'learning_rate': summary['hyperparameters']['common']['learning_rate'],
         'num_layers': num_layers,
@@ -250,6 +252,8 @@ def main(
     summary,
     use_sliding_window,
     sequence_length,
+    history_length,
+    prediction_length,
     batch_size,
     num_epochs,
     lr,
@@ -263,7 +267,7 @@ def main(
         raise ValueError("Summary['hyperparameters'] must contain 'common' key.")
 
     # Load and preprocess data
-    data = get_data(sequence_length=sequence_length, force_reprocess=False)
+    data = get_data(sequence_length=sequence_length, history_len=hist_len, prediction_len=pred_len, force_reprocess=False)
 
     if use_sliding_window:
         X_train_scaled = data["X_train_sliding_window_scaled"]
@@ -359,13 +363,14 @@ def main(
 if __name__ == "__main__":
     num_epochs=50
     
-    # batch_size=32 # [32, 64, 128, 256]
+    batch_size=32 # [32, 64, 128, 256]
     
-    # num_layers=5 # [1, 3, 5]
+    num_layers=1 # [1, 3, 5]
+    fc_hidden_sizes=[64]
     # fc_hidden_sizes=[512, 256, 128, 64, 32] # start with [4096, 2048, 1024, 512, 256]
     # model_hidden_size=32 # 
     
-    sequence_length=30
+    # sequence_length=30
     
     use_sliding_window=True
     train_loss_criteria=nn.MSELoss()
@@ -379,7 +384,7 @@ if __name__ == "__main__":
     transformer_num_layers = 1 # [1, 2, 4, 6]
     
 
-    learn_rates = [0.0005, 0.005, 0.1]
+    # learn_rates = [0.0005, 0.005]
     # numlayers_hidden_sizes_mapping = {
     #     1: [[16], [32], [64], [128]],
     #     2: [[32, 16], [64, 32], [128, 64], [256, 128]],
@@ -387,115 +392,126 @@ if __name__ == "__main__":
     #  }
     # model_hidden_sizes = [16, 32, 64, 128]
     
-    # batch_sizes=[32, 64, 128, 256]
+    # batch_sizes=[32, 64, 128]
     # sequence_lengths= [2, 16, 30]
-    model_hidden_sizes = [4, 16, 32]
+    # model_hidden_sizes = [4, 16, 32]
+    model_hidden_size = 32
     
-    # lr = 0.001
-    num_layers_list = [1, 5, 10]
-    fc_hidden_sizes = [64]
-    batch_size = 16
+    lr = 0.001
+    # num_layers_list = [1, 5, 10]
+    # fc_hidden_sizes = [64]
+    # batch_size = 16
     
-    for num_layers in num_layers_list:
-        for lr in learn_rates:
-            for model_hidden_size in model_hidden_sizes:
-                run_name = f"encoderdecoderlstm_lr_{lr}_numlayers_{num_layers}_hiddensize_{model_hidden_size}"
-                run_dir = create_run_directory(run_name)
-
-                # Set up logging to capture all print statements
-                sys.stdout = Logger(os.path.join(run_dir, "training_log.txt"))
-
-                print(f"Starting training run in directory: {run_dir}")
-
-                # Log hyperparameters
-                print("Hyperparameters:")
-                print(f"  batch_size: {batch_size}")
-                print(f"  num_epochs: {num_epochs}")
-                print(f"  learning rate: {lr}")
-                print(f"  num_layers: {num_layers}")
-                print(f"  fc_hidden_sizes: {fc_hidden_sizes}")
-                print(f"  model hidden size: {model_hidden_size}")
-                print(f"  sequence_length: {sequence_length}")
-                print(f"  use_sliding_window: {use_sliding_window}")
-                print(f"  transformer_hidden_size: {transformer_hidden_size}")
-                print(f"  transformer_nhead: {transformer_nhead}")
-                print(f"  transformer_dropout: {transformer_dropout}")
-
-                # save common hyperparameters
-                summary = {
-                    "hyperparameters": {
-                        "common": {
-                            "batch_size": batch_size,
-                            "num_epochs": num_epochs,
-                            "learning_rate": lr,
-                            "sequence_length": sequence_length,
-                            "use_sliding_window": use_sliding_window,
-                        },
-                    }
-                }
-
-                # Dictionary for models and model-specific parameters
-                models = {
-                    # "GRU": {
-                    #     "class": GRUModelDeep,
-                    #     "params": {
-                    #         "num_layers": num_layers,
-                    #         "fc_hidden_sizes": fc_hidden_sizes,
-                    #         "hidden_size": model_hidden_size,
-                    #     },
-                    # },
-                    # "LSTM": {
-                    #     "class": LSTMModelDeep,
-                    #     "params": {
-                    #         "num_layers": num_layers,
-                    #         "fc_hidden_sizes": fc_hidden_sizes,
-                    #         "hidden_size": model_hidden_size,
-                    #     },
-                    # },
-                    "EncoderDecoder": {
-                        "class": LSTMEncoderDecoder,
-                        "params": {
-                            "hidden_size": model_hidden_size,
-                            "num_layers": num_layers,
-                            "dropout": 0.0,
-                        },
-                    },
-                    # "Transformer": {
-                    #     "class": TransformerModel,
-                    #     "params": {
-                    #         "hidden_size": transformer_hidden_size,
-                    #         "num_layers": min(
-                    #             3, num_layers
-                    #         ),  # Transformers often need fewer layers
-                    #         "nhead": transformer_nhead,
-                    #         "dropout": transformer_dropout,
-                    #     },
-                    # },
-                }
-
-                summary = main(
-                    models,
-                    summary=summary,
-                    use_sliding_window=use_sliding_window,
-                    sequence_length=sequence_length,
-                    batch_size=batch_size,
-                    num_epochs=num_epochs,
-                    lr=lr,
-                    train_loss_criteria=train_loss_criteria,
-                    val_loss_criteria=val_loss_criteria,
-                )
+    hist_pred_lengths = [(10, 6), (12, 4), (18,12), (24, 6)]
+    
+    
+    for hist_len, pred_len in hist_pred_lengths:
                 
-                # Record results for each model
-                for model_name in models.keys():
-                    update_results_csv(
-                        summary, 
-                        model_name, 
-                        num_layers, 
-                        fc_hidden_sizes, 
-                        model_hidden_size,
-                        csv_path = "FareCaster/encoderdecoderlstm_hyperparam_results.csv"
-                    )
+        sequence_length = hist_len + pred_len
+        
+        run_name = f"vary_hist_pred_lens_histlen_{hist_len}_predlen_{pred_len}"
+        run_dir = create_run_directory(run_name)
 
-                # Close the logger
-                sys.stdout.close()
-                sys.stdout = sys.__stdout__
+        # Set up logging to capture all print statements
+        sys.stdout = Logger(os.path.join(run_dir, "training_log.txt"))
+
+        print(f"Starting training run in directory: {run_dir}")
+
+        # Log hyperparameters
+        print("Hyperparameters:")
+        print(f"  batch_size: {batch_size}")
+        print(f"  num_epochs: {num_epochs}")
+        print(f"  learning rate: {lr}")
+        print(f"  num_fc_layers: {num_layers}")
+        print(f"  fc_hidden_sizes: {fc_hidden_sizes}")
+        print(f"  model hidden size: {model_hidden_size}")
+        print(f"  sequence_length: {sequence_length}")
+        print(f"  history_length: {hist_len}")
+        print(f"  prediction_length: {pred_len}")
+        print(f"  use_sliding_window: {use_sliding_window}")
+        print(f"  transformer_hidden_size: {transformer_hidden_size}")
+        print(f"  transformer_nhead: {transformer_nhead}")
+        print(f"  transformer_dropout: {transformer_dropout}")
+
+        # save common hyperparameters
+        summary = {
+            "hyperparameters": {
+                "common": {
+                    "batch_size": batch_size,
+                    "num_epochs": num_epochs,
+                    "learning_rate": lr,
+                    "sequence_length": sequence_length,
+                    "history_length": hist_len,
+                    "prediction_length": pred_len,
+                    "use_sliding_window": use_sliding_window,
+                },
+            }
+        }
+
+        # Dictionary for models and model-specific parameters
+        models = {
+            "GRU": {
+                "class": GRUModelDeep,
+                "params": {
+                    "num_layers": num_layers,
+                    "fc_hidden_sizes": fc_hidden_sizes,
+                    "hidden_size": model_hidden_size,
+                },
+            },
+            "LSTM": {
+                "class": LSTMModelDeep,
+                "params": {
+                    "num_layers": num_layers,
+                    "fc_hidden_sizes": fc_hidden_sizes,
+                    "hidden_size": model_hidden_size,
+                },
+            },
+            # "EncoderDecoder": {
+            #     "class": LSTMEncoderDecoder,
+            #     "params": {
+            #         "hidden_size": model_hidden_size,
+            #         "num_layers": num_layers,
+            #         "dropout": 0.0,
+            #     },
+            # },
+            # "Transformer": {
+            #     "class": TransformerModel,
+            #     "params": {
+            #         "hidden_size": transformer_hidden_size,
+            #         "num_layers": min(
+            #             3, num_layers
+            #         ),  # Transformers often need fewer layers
+            #         "nhead": transformer_nhead,
+            #         "dropout": transformer_dropout,
+            #     },
+            # },
+        }
+
+        summary = main(
+            models,
+            summary=summary,
+            use_sliding_window=use_sliding_window,
+            sequence_length=sequence_length,
+            history_length=hist_len,
+            prediction_length=pred_len,
+            batch_size=batch_size,
+            num_epochs=num_epochs,
+            lr=lr,
+            train_loss_criteria=train_loss_criteria,
+            val_loss_criteria=val_loss_criteria,
+        )
+        
+        # Record results for each model
+        for model_name in models.keys():
+            update_results_csv(
+                summary, 
+                model_name, 
+                num_layers, 
+                fc_hidden_sizes, 
+                model_hidden_size,
+                csv_path = "FareCaster/vary_hist_pred_lens_hyperparam_results.csv"
+            )
+
+        # Close the logger
+        sys.stdout.close()
+        sys.stdout = sys.__stdout__
